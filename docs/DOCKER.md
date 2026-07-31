@@ -4,24 +4,19 @@ Baseline: [`mkronvold/techstack` ci.md](https://github.com/mkronvold/techstack/b
 Home host layout: [DEPLOY-HOME.md](./DEPLOY-HOME.md)  
 Probe is **not** containerized: [PROBE.md](./PROBE.md)
 
-## Phase 0
-
-No Dockerfiles or Compose files yet. Local development uses:
-
-```bash
-corepack pnpm dev
-```
-
-## Planned images (GHCR, home profile)
+## Images (GHCR, home profile)
 
 | Runtime | Packaging |
 | --- | --- |
 | `apps/api` | Multi-stage Node 26 `bookworm-slim` → `ghcr.io/mkronvold/wdmbg-api` |
-| `apps/web` | Static build + reverse-proxy-capable front → `ghcr.io/mkronvold/wdmbg-web` |
+| `apps/web` | Static Vite build + nginx reverse-proxy → `ghcr.io/mkronvold/wdmbg-web` |
 | `apps/probe` | **Host binary + systemd** on proxbox1 — not an image in MVP |
-| Postgres | Digest-pinned official image on the app-local network |
+| Postgres | Official image on the app-local network only |
 
-## Planned Compose topology (docker.lan)
+Dockerfiles: `apps/api/Dockerfile`, `apps/web/Dockerfile`.  
+Compose: `deploy/compose/compose.prod.yml` + `images.env` + `up.sh` / `down.sh`.
+
+## Compose topology (docker.lan)
 
 App directory: `~/src/wdmbg` on `mkronvold@docker.lan` (`10.0.0.202`).
 
@@ -44,16 +39,16 @@ App directory: `~/src/wdmbg` on `mkronvold@docker.lan` (`10.0.0.202`).
 | Rule | Detail |
 | --- | --- |
 | Proxy network | External `nginxproxy_proxy-net` |
-| On proxy-net | **web only** (service alias for NPM) |
+| On proxy-net | **web only** |
 | App network | `web`, `api`, `postgres` |
 | Host ports | **None** published |
 | Web duties | Serve UI; reverse-proxy `/api` and WebSocket `/api/live` to `api` |
-| NPM | `wdmbg.lan` → web container alias:port, HTTP, no public TLS |
+| NPM | `wdmbg.lan` → web container alias:port, HTTP, websockets on |
 | DNS | AdGuard rewrite `wdmbg.lan` → `10.0.0.202` |
 
-## Helpers (later)
+## Helpers
 
-When Compose lands, add `up.sh` / `down.sh` per WSL `~/.promptlib/updown.md`:
+`deploy/compose/up.sh` / `down.sh` follow updown conventions:
 
 - `set -euo pipefail`, cd to script dir, timestamped logs
 - `up.sh`: `docker compose pull` then `up -d "$@"`
@@ -61,4 +56,4 @@ When Compose lands, add `up.sh` / `down.sh` per WSL `~/.promptlib/updown.md`:
 
 ## Registry
 
-Home profile → **GHCR** (`ghcr.io/mkronvold/wdmbg-*`).
+Home profile → **GHCR** (`ghcr.io/mkronvold/wdmbg-*`). CI skeleton: `.github/workflows/images.yml`.

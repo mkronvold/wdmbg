@@ -1,0 +1,55 @@
+name: wdmbg
+
+networks:
+  app:
+    driver: bridge
+  proxy:
+    external: true
+    name: nginxproxy_proxy-net
+
+volumes:
+  postgres_data:
+
+services:
+  postgres:
+    image: ${WDMBG_POSTGRES_IMAGE:-postgres:16-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wdmbg}
+      POSTGRES_USER: ${POSTGRES_USER:-wdmbg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ${WDMBG_API_IMAGE:-ghcr.io/mkronvold/wdmbg-api:main}
+    restart: unless-stopped
+    env_file:
+      - ../env/api.env
+    environment:
+      WDMBG_API_HOST: 0.0.0.0
+      WDMBG_API_PORT: 4080
+      WDMBG_DATABASE_URL: postgres://${POSTGRES_USER:-wdmbg}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wdmbg}
+    volumes:
+      - ${WDMBG_GEOIP_HOST_PATH:-/var/empty}:/data/geoip:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
+
+  web:
+    image: ${WDMBG_WEB_IMAGE:-ghcr.io/mkronvold/wdmbg-web:main}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - app
+      - proxy

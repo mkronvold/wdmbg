@@ -23,40 +23,54 @@ Home app stack deploy: [DEPLOY-HOME.md](./DEPLOY-HOME.md)
 | Capture | Configurable interface (`tap*` / `vmbr*`) on that host |
 | Ingest URL | `http://wdmbg.lan/api/ingest/rollups` |
 
-Scaffold unit + env examples: [`deploy/proxbox1/`](../deploy/proxbox1/).
+Unit + env examples: [`deploy/proxbox1/`](../deploy/proxbox1/).
 
-**Phase 0:** stubs and docs only — do not install or start the unit yet.
-
-## Phase 0 module
+## Build and test
 
 ```bash
 cd apps/probe
 go test ./...
 go run . -version
 go run . -help
-go build -o wdmbg-probe .
+go run . -simulate -once -ingest-url http://127.0.0.1:4080/api/ingest/rollups
+GOOS=linux GOARCH=amd64 go build -o wdmbg-probe .
 ```
 
-Prints version/help only. Capture, buffering, and `POST` ingest are later phases.
+On Linux with libpcap:
 
-## Planned runtime
+```bash
+# requires libpcap-dev and CAP_NET_RAW / root for most ifaces
+go run . -iface vmbr0 -ingest-url http://wdmbg.lan/api/ingest/rollups
+```
+
+### Flags / env
+
+| Flag | Env | Default |
+| --- | --- | --- |
+| `-iface` | `WDMBG_CAPTURE_IFACE` | `vmbr0` |
+| `-ingest-url` | `WDMBG_API_INGEST_URL` | `http://wdmbg.lan/api/ingest/rollups` |
+| `-probe-id` | `WDMBG_PROBE_ID` | `probe-1` |
+| `-snaplen` | `WDMBG_SNAPLEN` | `128` |
+| `-interval` | `WDMBG_BATCH_INTERVAL_SEC` | `1` |
+| `-simulate` | `WDMBG_SIMULATE` | off |
+| `-once` | — | run brief simulate and exit |
+
+## Runtime layout
 
 | Item | Intent |
 | --- | --- |
-| Binary path | e.g. `/usr/local/bin/wdmbg-probe` |
+| Binary path | `/usr/local/bin/wdmbg-probe` |
 | Unit | `deploy/proxbox1/wdmbg-probe.service` → `/etc/systemd/system/` |
 | Env | `deploy/proxbox1/wdmbg-probe.env.example` → `/etc/wdmbg/probe.env` (mode 600) |
-| Capture iface | `WDMBG_CAPTURE_IFACE` (tap/vmbr on proxmox1) |
-| API | `WDMBG_API_INGEST_URL=http://wdmbg.lan/api/ingest/rollups` |
-| Transport | HTTP `POST` JSON rollup batches |
-| Restart | `on-failure` via systemd |
+| Transport | HTTP `POST` JSON rollup batches with exponential backoff |
+| Aggregation | 1s bidirectional flow buckets |
 
-Install sketch (later phase):
+## Safety
 
-```bash
-ssh proxbox1   # root@10.0.0.193
-# copy binary, unit, env; systemctl daemon-reload && enable --now wdmbg-probe
-```
+1. Confirm capture iface (`ip -br link`) before enabling the unit.
+2. Smoke with `-simulate -once` against a live API first.
+3. Do not leave the unit enabled if ingest URL is wrong (avoids retry storms).
+4. Prefer docs + artifacts over unattended enable on proxbox1.
 
 ## Out of MVP
 
