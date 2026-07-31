@@ -9,7 +9,7 @@ Probe host: [PROBE.md](./PROBE.md)
 
 | Role | Host | Access |
 | --- | --- | --- |
-| App stack (web, api, postgres) | `docker.lan` | SSH `mkronvold@docker.lan` |
+| App stack (web, api, postgres) | `docker.lan` | SSH `user@docker.lan` |
 | Probe (capture) | `proxbox1` / hostname `proxmox1` | SSH `proxbox1` (or `root@proxmox1`) |
 
 ## App directory on docker.lan
@@ -65,7 +65,7 @@ NPM admin (internal): `http://npm.lan:81`. AdGuard UI: `http://adguard.lan`.
 ## Bring-up (docker.lan)
 
 ```bash
-ssh mkronvold@docker.lan
+ssh user@docker.lan
 mkdir -p ~/src && cd ~/src
 git clone https://github.com/mkronvold/wdmbg.git wdmbg   # or pull
 cd ~/src/wdmbg/deploy/compose

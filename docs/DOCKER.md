@@ -18,7 +18,7 @@ Compose: `deploy/compose/compose.prod.yml` + `images.env` + `up.sh` / `down.sh`.
 
 ## Compose topology (docker.lan)
 
-App directory: `~/src/wdmbg` on `mkronvold@docker.lan`.
+App directory: `~/src/wdmbg` on `user@docker.lan`.
 
 ```text
                     nginxproxy_proxy-net
