@@ -62,6 +62,18 @@ NPM admin (internal): `http://npm.lan:81`. AdGuard UI: `http://adguard.lan`.
 | Live WS | `ws://wdmbg.lan/api/live` |
 | Probe ingest | `http://wdmbg.lan/api/ingest/rollups` |
 
+### Playwright live smoke
+
+After the stack is up and `wdmbg.lan` resolves:
+
+```bash
+pnpm install
+pnpm --filter @wdmbg/e2e exec playwright install chromium
+pnpm test:e2e
+```
+
+Details: [apps/e2e/README.md](../apps/e2e/README.md). Override base URL with `PLAYWRIGHT_BASE_URL`.
+
 ## Bring-up (docker.lan)
 
 ```bash

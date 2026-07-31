@@ -34,3 +34,9 @@ deploy/compose/logs/
 deploy/env/.env
 deploy/env/api.env
 
+# Playwright
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/playwright/.cache/
+

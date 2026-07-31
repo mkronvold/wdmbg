@@ -36,6 +36,7 @@ Postgres metadata + enrichment hooks, home compose/deploy docs.
 apps/api          Fastify + TypeScript API
 apps/web          React 19 + Vite dashboard
 apps/probe        Go probe (pcap linux + simulate)
+apps/e2e          Playwright live smoke (wdmbg.lan)
 packages/contracts  Shared Zod schemas
 packages/config     Shared env / defaults
 deploy/compose    compose.prod.yml, up.sh/down.sh, images.env
@@ -76,6 +77,19 @@ go run . -simulate -once -ingest-url http://127.0.0.1:4080/api/ingest/rollups
 corepack pnpm validate
 cd apps/probe && go test ./...
 ```
+
+## Live e2e smoke (Playwright)
+
+Against a running home deploy (`http://wdmbg.lan`). See [apps/e2e/README.md](apps/e2e/README.md).
+
+```bash
+corepack pnpm install
+corepack pnpm --filter @wdmbg/e2e exec playwright install chromium
+corepack pnpm test:e2e
+# optional: PLAYWRIGHT_BASE_URL=http://127.0.0.1:5173 corepack pnpm test:e2e
+```
+
+Runner must resolve `wdmbg.lan` (lab DNS). On Windows without `.lan` DNS, SSH to `docker.lan` and run the same commands from the checkout.
 
 ## Docs
 
