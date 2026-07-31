@@ -43,9 +43,10 @@ test.describe('WDMBG live smoke', () => {
   test('window toggle and host tables render without crash', async ({ page }) => {
     await page.goto('/');
 
-    const windowGroup = page.getByRole('group', { name: 'Time window' });
+    await expect(page.getByText('Traffic window', { exact: true })).toBeVisible();
+    const windowGroup = page.getByRole('group', { name: 'Traffic window' });
     await expect(windowGroup).toBeVisible();
-    for (const label of ['5s', '30s', '5m'] as const) {
+    for (const label of ['5s', '30s', '5m', '15m', '30m', '1h'] as const) {
       await expect(windowGroup.getByRole('button', { name: label, exact: true })).toBeVisible();
     }
 
@@ -65,6 +66,11 @@ test.describe('WDMBG live smoke', () => {
     await expect(
       page.getByRole('heading', { name: 'Top traffic by country', level: 2 }),
     ).toBeVisible();
+
+    // Card legends use "last …" lookback wording (MB/Mbps units).
+    await expect(page.getByText(/last 5s/).first()).toBeVisible();
+    await expect(page.getByText(/MB/).first()).toBeVisible();
+    await expect(page.getByText(/Mbps/).first()).toBeVisible();
 
     // API status line should resolve to ok (not stuck on … or down).
     await expect(page.getByText(/API:\s*ok/i)).toBeVisible({ timeout: 15_000 });
