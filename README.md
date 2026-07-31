@@ -20,8 +20,8 @@ Postgres metadata + enrichment hooks, home compose/deploy docs.
 | --- | --- |
 | Worker | None in MVP |
 | Auth | None (LAN-trusted) |
-| Live traffic | 15-minute **in-memory** 1s buckets in the API |
-| Windows | `5s` \| `30s` \| `5m` |
+| Live traffic | 1-hour **in-memory** 1s buckets in the API |
+| Windows | `5s` \| `30s` \| `5m` \| `15m` \| `30m` \| `1h` |
 | Probe → API | HTTP `POST` JSON rollups → `/api/ingest/rollups` |
 | Probe runtime | Go, host-native + systemd only (not containerized) |
 | Metadata store | Postgres + `pg` (aliases, lookup_cache, settings) |

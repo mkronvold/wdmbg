@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   healthSchema,
   isLocalAddress,
+  RING_BUCKET_COUNT,
   rollupEnvelopeSchema,
   windowSchema,
   WINDOW_SECONDS,
@@ -23,6 +24,14 @@ describe('windowSchema', () => {
     expect(WINDOW_SECONDS[windowSchema.parse('5s')]).toBe(5);
     expect(WINDOW_SECONDS[windowSchema.parse('30s')]).toBe(30);
     expect(WINDOW_SECONDS[windowSchema.parse('5m')]).toBe(300);
+    expect(WINDOW_SECONDS[windowSchema.parse('15m')]).toBe(900);
+    expect(WINDOW_SECONDS[windowSchema.parse('30m')]).toBe(1800);
+    expect(WINDOW_SECONDS[windowSchema.parse('1h')]).toBe(3600);
+  });
+
+  it('sizes the ring for 1 hour of 1s buckets', () => {
+    expect(RING_BUCKET_COUNT).toBe(3600);
+    expect(RING_BUCKET_COUNT).toBe(WINDOW_SECONDS['1h']);
   });
 });
 

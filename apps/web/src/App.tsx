@@ -7,7 +7,7 @@ import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
 
-const WINDOWS: QueryWindow[] = ['5s', '30s', '5m'];
+const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
 const CARD_ORDER_KEY = 'wdmbg.dashboard.cardOrder';
 

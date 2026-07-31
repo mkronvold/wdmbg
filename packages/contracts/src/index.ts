@@ -1,16 +1,19 @@
 import { z } from 'zod';
 
-/** Sliding query windows over the 15-minute in-memory ring. */
-export const windowSchema = z.enum(['5s', '30s', '5m']);
+/** Sliding query windows over the 1-hour in-memory ring. */
+export const windowSchema = z.enum(['5s', '30s', '5m', '15m', '30m', '1h']);
 export type QueryWindow = z.infer<typeof windowSchema>;
 
 export const WINDOW_SECONDS: Record<QueryWindow, number> = {
   '5s': 5,
   '30s': 30,
   '5m': 300,
+  '15m': 900,
+  '30m': 1800,
+  '1h': 3600,
 };
 
-export const RING_BUCKET_COUNT = 900;
+export const RING_BUCKET_COUNT = 3600;
 export const BUCKET_INTERVAL_SEC = 1;
 
 export const l4Schema = z.enum(['tcp', 'udp', 'icmp', 'other']);
