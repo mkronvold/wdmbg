@@ -84,7 +84,11 @@ export const flowRowSchema = z.object({
   l7: z.string().optional(),
   bytes: z.number().nonnegative(),
   packets: z.number().nonnegative(),
-  /** Present on host-relative flow views. */
+  /**
+   * Directional bytes.
+   * - Host-relative views: TX/RX from the selected host's perspective.
+   * - Hot flows (no host): TX = src→dst, RX = dst→src.
+   */
   txBytes: z.number().nonnegative().optional(),
   rxBytes: z.number().nonnegative().optional(),
 });
