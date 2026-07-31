@@ -6,7 +6,14 @@ import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
-import { applyTheme, persistTheme, resolveInitialTheme, type Theme } from './theme';
+import {
+  THEME_IDS,
+  THEME_LABELS,
+  applyTheme,
+  persistTheme,
+  resolveInitialTheme,
+  type ThemeId,
+} from './theme';
 
 const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
@@ -64,7 +71,7 @@ export function App() {
   const [draggingId, setDraggingId] = useState<CardId | null>(null);
   const [dragOverId, setDragOverId] = useState<CardId | null>(null);
   const [paused, setPaused] = useState(false);
-  const [theme, setTheme] = useState<Theme>(() => resolveInitialTheme());
+  const [theme, setTheme] = useState<ThemeId>(() => resolveInitialTheme());
 
   useEffect(() => {
     applyTheme(theme);
@@ -130,13 +137,10 @@ export function App() {
     setSelectedHost(host);
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => {
-      const next: Theme = prev === 'dark' ? 'light' : 'dark';
-      persistTheme(next);
-      applyTheme(next);
-      return next;
-    });
+  const onThemeChange = useCallback((next: ThemeId) => {
+    persistTheme(next);
+    applyTheme(next);
+    setTheme(next);
   }, []);
 
   const secs = WINDOW_SECONDS[window];
@@ -376,15 +380,24 @@ export function App() {
         </div>
         <div className="hero-meta">
           <div className="hero-controls">
-            <button
-              type="button"
-              className="copy-btn icon-btn"
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-              title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
-            >
-              {theme === 'dark' ? '☀' : '☽'}
-            </button>
+            <div className="theme-control">
+              <label className="window-label" htmlFor="theme-select">
+                Theme
+              </label>
+              <select
+                id="theme-select"
+                className="theme-select"
+                value={theme}
+                aria-label="Color theme"
+                onChange={(event) => onThemeChange(event.target.value as ThemeId)}
+              >
+                {THEME_IDS.map((id) => (
+                  <option key={id} value={id}>
+                    {THEME_LABELS[id]}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               className="copy-btn icon-btn"
