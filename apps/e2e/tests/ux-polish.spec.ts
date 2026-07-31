@@ -1,38 +1,34 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('WDMBG UX polish (theme / pause / windows)', () => {
-  test('theme toggle flips data-theme and persists wdmbg.theme', async ({ page }) => {
+  test('theme select sets data-theme and persists wdmbg.theme', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'WDMBG', level: 1 })).toBeVisible();
 
-    const themeBtn = page.getByRole('button', {
-      name: /Switch to (light|dark) theme/i,
-    });
-    await expect(themeBtn).toBeVisible();
-    await expect(themeBtn).toHaveText(/[☀☽]/);
+    const themeSelect = page.getByRole('combobox', { name: 'Color theme' });
+    await expect(themeSelect).toBeVisible();
 
-    const before = await page.evaluate(() => ({
-      theme: document.documentElement.getAttribute('data-theme'),
-      stored: localStorage.getItem('wdmbg.theme'),
-    }));
-    expect(before.theme === 'light' || before.theme === 'dark').toBeTruthy();
+    await themeSelect.selectOption('light');
+    await expect
+      .poll(async () =>
+        page.evaluate(() => ({
+          theme: document.documentElement.getAttribute('data-theme'),
+          stored: localStorage.getItem('wdmbg.theme'),
+        })),
+      )
+      .toEqual({ theme: 'light', stored: 'light' });
+    await expect(themeSelect).toHaveValue('light');
 
-    await themeBtn.click();
-
-    const after = await page.evaluate(() => ({
-      theme: document.documentElement.getAttribute('data-theme'),
-      stored: localStorage.getItem('wdmbg.theme'),
-    }));
-    expect(after.theme).not.toBe(before.theme);
-    expect(after.theme === 'light' || after.theme === 'dark').toBeTruthy();
-    expect(after.stored).toBe(after.theme);
-
-    // Icon should reflect the opposite action after flip.
-    await expect(
-      page.getByRole('button', {
-        name: after.theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme',
-      }),
-    ).toBeVisible();
+    await themeSelect.selectOption('midnight');
+    await expect
+      .poll(async () =>
+        page.evaluate(() => ({
+          theme: document.documentElement.getAttribute('data-theme'),
+          stored: localStorage.getItem('wdmbg.theme'),
+        })),
+      )
+      .toEqual({ theme: 'midnight', stored: 'midnight' });
+    await expect(themeSelect).toHaveValue('midnight');
   });
 
   test('pause shows Paused badge; resume clears it', async ({ page }) => {
