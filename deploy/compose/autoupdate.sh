@@ -49,6 +49,11 @@ if ! command -v flock >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+  log_error 'jq is required to resolve compose service images.'
+  exit 1
+fi
+
 one_shot=false
 interval_minutes="$default_interval_minutes"
 
@@ -102,7 +107,8 @@ compose_cmd() {
 
 service_image() {
   local service="$1"
-  compose_cmd config "$service" | awk -F': ' '/^[[:space:]]*image:[[:space:]]*/ { print $2; exit }'
+  # `docker compose config <service>` still renders the full project; select by name.
+  compose_cmd config --format json | jq -r --arg s "$service" '.services[$s].image // empty'
 }
 
 image_repository() {
