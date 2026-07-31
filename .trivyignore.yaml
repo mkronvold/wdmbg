@@ -1,0 +1,7 @@
+# Approved Trivy exceptions. Every entry needs an owner in its statement and an
+# expired_at date. Prefer remediation over suppressions.
+# See https://github.com/mkronvold/techstack/blob/main/scanning.md
+vulnerabilities: []
+misconfigurations: []
+secrets: []
+licenses: []
