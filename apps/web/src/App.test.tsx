@@ -96,6 +96,8 @@ describe('App', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'WDMBG' })).toBeInTheDocument();
     expect(screen.getByText('Where did my bandwidth go?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '30s' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '15m' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '1h' })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });

@@ -84,7 +84,10 @@ body {
 
 .window-toggle {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  justify-content: flex-end;
+  max-width: 22rem;
 }
 
 .small {
