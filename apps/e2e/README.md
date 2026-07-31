@@ -41,19 +41,16 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:5173 pnpm test:e2e
 PLAYWRIGHT_BASE_URL=http://wdmbg.lan pnpm test:e2e
 ```
 
-### When this machine cannot resolve `.lan`
+### When this machine cannot resolve `wdmbg.lan`
 
-Run from a host on the lab network (e.g. `docker.lan`):
+If NPM is already up (e.g. at `docker.lan` / `10.0.0.202`) but AdGuard has not published `wdmbg.lan` yet, map the hostname for Chromium and the API request helper:
 
 ```bash
-ssh mkronvold@docker.lan
-cd ~/src/wdmbg   # or clone/checkout the PR branch
-pnpm install --filter @wdmbg/e2e...
-pnpm --filter @wdmbg/e2e exec playwright install --with-deps chromium
-pnpm test:e2e
+# docker.lan currently resolves to the NPM IP on the lab LAN
+PLAYWRIGHT_MAP_HOST=10.0.0.202 pnpm test:e2e
 ```
 
-If AdGuard has not published `wdmbg.lan` yet but the web container is up, you can still hit the stack via host/`--add-host` or temporary `/etc/hosts` on the runner — do **not** commit hosts/credentials.
+`PLAYWRIGHT_MAP_HOST` sets Chromium `--host-resolver-rules=MAP wdmbg.lan <ip>` and sends `Host: wdmbg.lan` for the Node-side health request. Do **not** commit hosts files or credentials.
 
 ## Smoke coverage
 

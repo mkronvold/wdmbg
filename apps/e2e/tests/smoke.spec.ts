@@ -1,8 +1,31 @@
 import { expect, test } from '@playwright/test';
 
+function logicalHost(): string {
+  const base = process.env.PLAYWRIGHT_BASE_URL ?? 'http://wdmbg.lan';
+  try {
+    return new URL(base).hostname;
+  } catch {
+    return 'wdmbg.lan';
+  }
+}
+
+/**
+ * APIRequestContext is Node-side and ignores Chromium host-resolver MAP.
+ * When PLAYWRIGHT_MAP_HOST is set, call the IP with a Host header.
+ */
+async function getHealth(request: import('@playwright/test').APIRequestContext) {
+  const mapHost = process.env.PLAYWRIGHT_MAP_HOST;
+  if (mapHost) {
+    return request.get(`http://${mapHost}/api/health`, {
+      headers: { Host: logicalHost() },
+    });
+  }
+  return request.get('/api/health');
+}
+
 test.describe('WDMBG live smoke', () => {
   test('API health responds ok', async ({ request }) => {
-    const res = await request.get('/api/health');
+    const res = await getHealth(request);
     expect(res.ok(), `health status ${res.status()}`).toBeTruthy();
     const body = (await res.json()) as { status?: string; service?: string };
     expect(body.status).toBe('ok');
