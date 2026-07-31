@@ -1,19 +1,19 @@
 # syntax=docker/dockerfile:1
-FROM node:26-bookworm-slim AS base
+
+FROM node:26-bookworm-slim AS build
 WORKDIR /src
-RUN corepack enable
+ENV CI=1
+RUN npm install -g pnpm@10.33.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/web/package.json apps/web/
-RUN corepack pnpm install --frozen-lockfile --filter @wdmbg/web...
-
-FROM base AS build
+RUN pnpm install --frozen-lockfile --filter @wdmbg/web...
 COPY packages/contracts packages/contracts
 COPY apps/web apps/web
-RUN corepack pnpm --filter @wdmbg/contracts build \
-  && corepack pnpm --filter @wdmbg/web build
+RUN pnpm --filter @wdmbg/contracts build \
+  && pnpm --filter @wdmbg/web build
 
-FROM nginx:1.28-alpine AS runtime
+FROM nginx:1.27-alpine AS runtime
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/apps/web/dist /usr/share/nginx/html
 EXPOSE 80

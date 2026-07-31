@@ -9,13 +9,15 @@ on:
       - 'apps/web/**'
       - 'packages/**'
       - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - '.github/workflows/images.yml'
   pull_request:
     paths:
       - 'apps/api/**'
       - 'apps/web/**'
       - 'packages/**'
-      - 'Dockerfile*'
+      - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - '.github/workflows/images.yml'
 
 concurrency:
@@ -32,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: api

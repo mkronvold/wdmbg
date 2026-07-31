@@ -1,27 +1,29 @@
 # syntax=docker/dockerfile:1
-FROM node:26-bookworm-slim AS base
+
+FROM node:26-bookworm-slim AS build
 WORKDIR /src
-RUN corepack enable
+ENV CI=1
+# node:*-slim images no longer ship corepack on PATH; install pnpm via npm.
+RUN npm install -g pnpm@10.33.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY packages/config/package.json packages/config/
 COPY packages/contracts/package.json packages/contracts/
 COPY apps/api/package.json apps/api/
-RUN corepack pnpm install --frozen-lockfile --filter @wdmbg/api...
-
-FROM base AS build
+RUN pnpm install --frozen-lockfile --filter @wdmbg/api...
 COPY packages/config packages/config
 COPY packages/contracts packages/contracts
 COPY apps/api apps/api
-RUN corepack pnpm --filter @wdmbg/contracts build \
-  && corepack pnpm --filter @wdmbg/config build \
-  && corepack pnpm --filter @wdmbg/api build \
-  && corepack pnpm --filter @wdmbg/api deploy --prod --legacy /out
+RUN pnpm --filter @wdmbg/contracts build \
+  && pnpm --filter @wdmbg/config build \
+  && pnpm --filter @wdmbg/api build \
+  && pnpm --filter @wdmbg/api deploy --prod --legacy /out
 
 FROM node:26-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN useradd --system --uid 10001 --create-home wdmbg
-COPY --from=build /out/ ./
+RUN groupadd --gid 10001 wdmbg \
+  && useradd --uid 10001 --gid wdmbg --create-home --home-dir /app --shell /usr/sbin/nologin wdmbg
+COPY --from=build --chown=wdmbg:wdmbg /out/ ./
 USER wdmbg
 EXPOSE 4080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
