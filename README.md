@@ -27,8 +27,8 @@ Postgres metadata + enrichment hooks, home compose/deploy docs.
 | Metadata store | Postgres + `pg` (aliases, lookup_cache, settings) |
 | L7 | Port heuristics; nDPI deferred |
 | Registry | Home profile — GHCR (`ghcr.io/mkronvold/...`) |
-| App host | `docker.lan` (`10.0.0.202`) → `~/src/wdmbg`, NPM + `wdmbg.lan` |
-| Probe host | `proxbox1` / `proxmox1` (`10.0.0.193`) host-native + systemd |
+| App host | `docker.lan` → `~/src/wdmbg`, NPM + `wdmbg.lan` |
+| Probe host | `proxbox1` / `proxmox1` host-native + systemd |
 
 ## Workspace layout
 

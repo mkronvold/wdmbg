@@ -18,7 +18,7 @@ Compose: `deploy/compose/compose.prod.yml` + `images.env` + `up.sh` / `down.sh`.
 
 ## Compose topology (docker.lan)
 
-App directory: `~/src/wdmbg` on `mkronvold@docker.lan` (`10.0.0.202`).
+App directory: `~/src/wdmbg` on `mkronvold@docker.lan`.
 
 ```text
                     nginxproxy_proxy-net
@@ -44,7 +44,7 @@ App directory: `~/src/wdmbg` on `mkronvold@docker.lan` (`10.0.0.202`).
 | Host ports | **None** published |
 | Web duties | Serve UI; reverse-proxy `/api` and WebSocket `/api/live` to `api` |
 | NPM | `wdmbg.lan` → web container alias:port, HTTP, websockets on |
-| DNS | AdGuard rewrite `wdmbg.lan` → `10.0.0.202` |
+| DNS | AdGuard rewrite `wdmbg.lan` → `docker.lan` |
 
 ## Helpers
 

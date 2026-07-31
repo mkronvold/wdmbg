@@ -9,8 +9,8 @@ Probe host: [PROBE.md](./PROBE.md)
 
 | Role | Host | Access |
 | --- | --- | --- |
-| App stack (web, api, postgres) | `docker.lan` (`10.0.0.202`) | SSH `mkronvold@docker.lan` |
-| Probe (capture) | `proxbox1` / hostname `proxmox1` (`10.0.0.193`) | SSH `root@10.0.0.193` (alias `proxbox1`) |
+| App stack (web, api, postgres) | `docker.lan` | SSH `mkronvold@docker.lan` |
+| Probe (capture) | `proxbox1` / hostname `proxmox1` | SSH `proxbox1` (or `root@proxmox1`) |
 
 ## App directory on docker.lan
 
@@ -43,7 +43,7 @@ Suggested layout after checkout:
 
 | Item | Value |
 | --- | --- |
-| AdGuard rewrite | `wdmbg.lan` → `10.0.0.202` |
+| AdGuard rewrite | `wdmbg.lan` → `docker.lan` |
 | NPM domain | `wdmbg.lan` |
 | NPM scheme | `http` |
 | NPM forward | Docker DNS name for **web** (compose project service `web`) port `80` |
