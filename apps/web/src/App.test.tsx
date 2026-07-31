@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
@@ -47,6 +47,26 @@ vi.mock('./api/client', () => ({
     ],
     topCountries: [{ country: 'Unknown', bytes: 9_000_000 }],
   })),
+  fetchHost: vi.fn(async (host: string) => ({
+    host,
+    window: '30s',
+    generatedAt: '2026-07-30T12:00:00.000Z',
+    txBytes: 0,
+    rxBytes: 0,
+    totalBytes: 0,
+    txRateBps: 0,
+    rxRateBps: 0,
+    topProtocols: [],
+    topPeers: [],
+  })),
+  fetchHostFlows: vi.fn(async (host: string) => ({
+    host,
+    window: '30s',
+    generatedAt: '2026-07-30T12:00:00.000Z',
+    flows: [],
+  })),
+  putAlias: vi.fn(),
+  resolveHosts: vi.fn(),
 }));
 
 describe('App', () => {
@@ -84,5 +104,41 @@ describe('App', () => {
     expect(screen.getAllByRole('columnheader', { name: 'TX MB' }).length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
+  });
+
+  it('opens host details from hot flow Src/Dst IPs', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <App />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+    });
+
+    // Dst IP on Hot flows
+    fireEvent.click(screen.getByRole('button', { name: '1.1.1.1' }));
+    expect(await screen.findByRole('dialog', { name: /Host 1\.1\.1\.1/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    // Src IP on Hot flows (same address may also appear as talker host label)
+    const srcButtons = screen.getAllByRole('button', { name: '10.0.0.10' });
+    expect(srcButtons.length).toBeGreaterThan(0);
+    fireEvent.click(srcButtons[srcButtons.length - 1]!);
+    expect(await screen.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
+
+    // Talker host label still opens the same HostDialog
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'laptop' })[0]!);
+    expect(await screen.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
   });
 });

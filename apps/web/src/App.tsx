@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { CountryRow, FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contracts';
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type DragEvent, type ReactNode } from 'react';
 import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, windowLegend } from './components/format';
@@ -115,8 +115,8 @@ export function App() {
     };
   }, []);
 
-  const openHost = useMemo(() => {
-    return (row: TalkerRow) => setSelectedHost(row.host);
+  const selectHost = useCallback((host: string) => {
+    setSelectedHost(host);
   }, []);
 
   const secs = WINDOW_SECONDS[window];
@@ -187,7 +187,7 @@ export function App() {
             header: 'Host',
             cellClassName: 'cell-host',
             render: (r: TalkerRow) => r.label ?? r.host,
-            onCellClick: openHost,
+            onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
           { key: 'tx', header: 'TX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.txBytes) },
           { key: 'rx', header: 'RX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.rxBytes) },
@@ -223,7 +223,7 @@ export function App() {
             header: 'Host',
             cellClassName: 'cell-host',
             render: (r: TalkerRow) => r.label ?? r.host,
-            onCellClick: openHost,
+            onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
           { key: 'rx', header: 'RX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.rxBytes) },
           { key: 'tx', header: 'TX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.txBytes) },
@@ -276,6 +276,7 @@ export function App() {
             header: 'Src',
             cellClassName: 'cell-host',
             render: (r: FlowRow) => r.src,
+            onCellClick: (r: FlowRow) => selectHost(r.src),
           },
           { key: 'sp', header: 'SPort', numeric: true, render: (r: FlowRow) => r.srcPort },
           {
@@ -283,6 +284,7 @@ export function App() {
             header: 'Dst',
             cellClassName: 'cell-host',
             render: (r: FlowRow) => r.dst,
+            onCellClick: (r: FlowRow) => selectHost(r.dst),
           },
           { key: 'dp', header: 'DPort', numeric: true, render: (r: FlowRow) => r.dstPort },
           { key: 'l4', header: 'L4', render: (r: FlowRow) => r.l4 },
