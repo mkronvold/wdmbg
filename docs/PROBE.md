@@ -17,8 +17,7 @@ Home app stack deploy: [DEPLOY-HOME.md](./DEPLOY-HOME.md)
 | --- | --- |
 | Host alias | `proxbox1` |
 | Hostname | `proxmox1` |
-| Address | `10.0.0.193` |
-| SSH | `root@10.0.0.193` (or SSH config host `proxbox1`) |
+| SSH | `proxbox1` (SSH config host; or `root@proxmox1`) |
 | Runtime | Host-native Go binary + **systemd only** |
 | Capture | Configurable interface (`tap*` / `vmbr*`) on that host |
 | Ingest URL | `http://wdmbg.lan/api/ingest/rollups` |
