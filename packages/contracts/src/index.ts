@@ -155,10 +155,22 @@ export const resolveRequestSchema = z.object({
 });
 export type ResolveRequest = z.infer<typeof resolveRequestSchema>;
 
+/** Where a resolved hostname came from (first hit in the resolve chain). */
+export const resolveSourceSchema = z.enum([
+  'alias',
+  'adguard-rewrite',
+  'adguard-dhcp',
+  'adguard-client',
+  'ptr',
+  'cache',
+  'none',
+]);
+export type ResolveSource = z.infer<typeof resolveSourceSchema>;
+
 export const resolveResultSchema = z.object({
   host: z.string(),
   hostname: z.string().nullable(),
-  source: z.enum(['cache', 'ptr', 'alias', 'none']),
+  source: resolveSourceSchema,
 });
 export type ResolveResult = z.infer<typeof resolveResultSchema>;
 

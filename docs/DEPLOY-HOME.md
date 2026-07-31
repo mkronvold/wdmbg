@@ -108,10 +108,16 @@ docker compose -f compose.prod.yml ps
 API applies schema on startup when `WDMBG_DATABASE_URL` is set:
 
 - `aliases` — persistent host labels
-- `lookup_cache` — PTR / geo cache
+- `lookup_cache` — hostname / geo cache (AdGuard + PTR)
 - `settings` — reserved key/value
 
 If `WDMBG_DATABASE_URL` is unset, API uses in-memory meta (dev).
+
+### AdGuard hostname resolution (optional)
+
+Set `WDMBG_ADGUARD_URL=http://adguard.lan` (plus basic-auth user/password) in `api.env`
+so the API can label LAN hosts from rewrites/DHCP/clients before PTR. Details:
+[ENRICHMENT.md](./ENRICHMENT.md). Ensure the API container can reach that URL.
 
 ## Probe install (proxbox1)
 

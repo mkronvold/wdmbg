@@ -100,7 +100,7 @@ Runner must resolve `wdmbg.lan` (lab DNS). On Windows without `.lan` DNS, SSH to
 | [docs/DOCKER.md](docs/DOCKER.md) | Compose topology |
 | [docs/DEPLOY-HOME.md](docs/DEPLOY-HOME.md) | docker.lan + proxbox1 runbook |
 | [docs/PROBE.md](docs/PROBE.md) | Go probe |
-| [docs/ENRICHMENT.md](docs/ENRICHMENT.md) | PTR / GeoIP / country rules |
+| [docs/ENRICHMENT.md](docs/ENRICHMENT.md) | Hostname resolve (alias / AdGuard / PTR) + GeoIP |
 | [docs/GITHUB-SETUP.md](docs/GITHUB-SETUP.md) | Repo settings checklist |
 | [security/exceptions.md](security/exceptions.md) | Temporary baseline exceptions |
 

@@ -3,17 +3,37 @@ import { buildApp } from './app.js';
 import { MemoryMetaStore, type MetaStore } from './meta/store.js';
 import { createPool, PostgresMetaStore } from './db/postgres.js';
 import { GeoIpService } from './geoip.js';
+import { createAdGuardNameProviderFromEnv } from './adguard/resolver.js';
 
 async function main() {
   const databaseUrl = process.env.WDMBG_DATABASE_URL;
+  const { provider: adguard, config: adguardConfig } = createAdGuardNameProviderFromEnv(
+    process.env,
+    {
+      logger: {
+        warn: (msg) => {
+          console.warn(msg);
+        },
+      },
+    },
+  );
+
+  if (adguardConfig.enabled && adguardConfig.baseUrl) {
+    console.info(`AdGuard name resolution enabled (${adguardConfig.baseUrl})`);
+  }
+
   let meta: MetaStore = new MemoryMetaStore({
     ptrEnabled: process.env.WDMBG_PTR_ENABLED !== '0',
+    adguard,
+    adguardCacheTtlMs: adguardConfig.cacheTtlMs,
   });
 
   if (databaseUrl) {
     const pool = await createPool(databaseUrl);
     const pgMeta = new PostgresMetaStore(pool, {
       ptrEnabled: process.env.WDMBG_PTR_ENABLED !== '0',
+      adguard,
+      adguardCacheTtlMs: adguardConfig.cacheTtlMs,
     });
     await pgMeta.warm();
     meta = pgMeta;
