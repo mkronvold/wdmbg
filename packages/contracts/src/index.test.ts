@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   healthSchema,
   isLocalAddress,
+  resolveResultSchema,
+  resolveSourceSchema,
   RING_BUCKET_COUNT,
   rollupEnvelopeSchema,
   windowSchema,
@@ -83,5 +85,28 @@ describe('isLocalAddress', () => {
     expect(isLocalAddress('127.0.0.1')).toBe(true);
     expect(isLocalAddress('8.8.8.8')).toBe(false);
     expect(isLocalAddress('1.1.1.1')).toBe(false);
+  });
+});
+
+describe('resolveSourceSchema', () => {
+  it('accepts AdGuard sources and legacy cache', () => {
+    for (const source of [
+      'alias',
+      'adguard-rewrite',
+      'adguard-dhcp',
+      'adguard-client',
+      'ptr',
+      'cache',
+      'none',
+    ] as const) {
+      expect(resolveSourceSchema.parse(source)).toBe(source);
+    }
+    expect(
+      resolveResultSchema.parse({
+        host: '10.0.0.1',
+        hostname: 'nas.lan',
+        source: 'adguard-rewrite',
+      }).source,
+    ).toBe('adguard-rewrite');
   });
 });

@@ -2,8 +2,13 @@ import pg from 'pg';
 import type { Alias, ResolveResult } from '@wdmbg/contracts';
 import { isLocalAddress } from '@wdmbg/contracts';
 import type { LabelLookup } from '../traffic/aggregate.js';
-import type { MetaStore } from '../meta/store.js';
-import dns from 'node:dns/promises';
+import {
+  resolveHosts,
+  type LookupCacheEntry,
+  type LookupCacheSource,
+  type MetaStore,
+} from '../meta/store.js';
+import type { AdGuardNameProvider } from '../adguard/resolver.js';
 
 const { Pool } = pg;
 
@@ -39,16 +44,26 @@ export async function createPool(databaseUrl: string): Promise<pg.Pool> {
 
 export class PostgresMetaStore implements MetaStore {
   private readonly cacheTtlMs: number;
+  private readonly adguardCacheTtlMs: number;
   private readonly ptrEnabled: boolean;
+  private readonly adguard: AdGuardNameProvider | null;
   private memAlias = new Map<string, string>();
   private memCountry = new Map<string, string>();
+  private memHostname = new Map<string, { hostname: string; expiresAt: number }>();
 
   constructor(
     private readonly pool: pg.Pool,
-    opts?: { cacheTtlMs?: number; ptrEnabled?: boolean },
+    opts?: {
+      cacheTtlMs?: number;
+      adguardCacheTtlMs?: number;
+      ptrEnabled?: boolean;
+      adguard?: AdGuardNameProvider | null;
+    },
   ) {
     this.cacheTtlMs = opts?.cacheTtlMs ?? 60 * 60 * 1000;
+    this.adguardCacheTtlMs = opts?.adguardCacheTtlMs ?? 10 * 60 * 1000;
     this.ptrEnabled = opts?.ptrEnabled ?? true;
+    this.adguard = opts?.adguard ?? null;
   }
 
   async warm(): Promise<void> {
@@ -59,12 +74,22 @@ export class PostgresMetaStore implements MetaStore {
     for (const row of aliases.rows) {
       this.memAlias.set(row.host, row.alias);
     }
-    const countries = await this.pool.query<{ host: string; country: string }>(
-      `SELECT host, country FROM lookup_cache WHERE expires_at > NOW()`,
-    );
+    const cacheRows = await this.pool.query<{
+      host: string;
+      country: string;
+      hostname: string | null;
+      expires_at: Date;
+    }>(`SELECT host, country, hostname, expires_at FROM lookup_cache WHERE expires_at > NOW()`);
     this.memCountry.clear();
-    for (const row of countries.rows) {
+    this.memHostname.clear();
+    for (const row of cacheRows.rows) {
       this.memCountry.set(row.host, row.country);
+      if (row.hostname) {
+        this.memHostname.set(row.host, {
+          hostname: row.hostname,
+          expiresAt: row.expires_at.getTime(),
+        });
+      }
     }
   }
 
@@ -105,73 +130,79 @@ export class PostgresMetaStore implements MetaStore {
     return this.memCountry.get(host) ?? 'Unknown';
   }
 
+  private getCachedHostname(host: string): string | undefined {
+    const mem = this.memHostname.get(host);
+    if (mem && mem.expiresAt > Date.now()) {
+      return mem.hostname;
+    }
+    return undefined;
+  }
+
   asLabelLookup(): LabelLookup {
     return {
-      getLabel: (host) => this.getAlias(host),
+      getLabel: (host) => this.getAlias(host) ?? this.getCachedHostname(host),
       getCountry: (host) => this.getCountry(host),
     };
   }
 
   async resolve(hosts: string[]): Promise<ResolveResult[]> {
-    const results: ResolveResult[] = [];
-    for (const host of hosts) {
-      const alias = this.getAlias(host);
-      if (alias) {
-        results.push({ host, hostname: alias, source: 'alias' });
-        continue;
-      }
-
-      const cached = await this.pool.query<{
-        hostname: string | null;
-        expires_at: Date;
-      }>(`SELECT hostname, expires_at FROM lookup_cache WHERE host = $1`, [host]);
-      const row = cached.rows[0];
-      if (row && row.expires_at.getTime() > Date.now()) {
-        results.push({
+    return resolveHosts(hosts, {
+      getAlias: (h) => this.getAlias(h),
+      readCache: async (host) => {
+        const cached = await this.pool.query<{
+          hostname: string | null;
+          country: string;
+          asn: string | null;
+          source: string;
+          expires_at: Date;
+        }>(`SELECT hostname, country, asn, source, expires_at FROM lookup_cache WHERE host = $1`, [
+          host,
+        ]);
+        const row = cached.rows[0];
+        if (!row) return null;
+        return {
           host,
           hostname: row.hostname,
-          source: row.hostname ? 'cache' : 'none',
-        });
-        continue;
-      }
-
-      if (!this.ptrEnabled) {
-        results.push({ host, hostname: null, source: 'none' });
-        continue;
-      }
-
-      let hostname: string | null = null;
-      try {
-        const names = await dns.reverse(host);
-        hostname = names[0] ?? null;
-      } catch {
-        hostname = null;
-      }
-
-      const country = this.getCountry(host);
-      const expires = new Date(Date.now() + this.cacheTtlMs);
-      await this.pool.query(
-        `INSERT INTO lookup_cache (host, hostname, country, asn, source, expires_at, updated_at)
-         VALUES ($1, $2, $3, NULL, 'ptr', $4, NOW())
-         ON CONFLICT (host) DO UPDATE SET
-           hostname = EXCLUDED.hostname,
-           country = EXCLUDED.country,
-           source = EXCLUDED.source,
-           expires_at = EXCLUDED.expires_at,
-           updated_at = NOW()`,
-        [host, hostname, country, expires],
-      );
-      this.memCountry.set(host, country);
-      results.push({
-        host,
-        hostname,
-        source: hostname ? 'ptr' : 'none',
-      });
-    }
-    return results;
+          country: row.country,
+          asn: row.asn,
+          source: row.source as LookupCacheSource,
+          expiresAt: row.expires_at.getTime(),
+        };
+      },
+      writeCache: async (entry: LookupCacheEntry) => {
+        const expires = new Date(entry.expiresAt);
+        await this.pool.query(
+          `INSERT INTO lookup_cache (host, hostname, country, asn, source, expires_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+           ON CONFLICT (host) DO UPDATE SET
+             hostname = EXCLUDED.hostname,
+             country = EXCLUDED.country,
+             asn = EXCLUDED.asn,
+             source = EXCLUDED.source,
+             expires_at = EXCLUDED.expires_at,
+             updated_at = NOW()`,
+          [entry.host, entry.hostname, entry.country, entry.asn, entry.source, expires],
+        );
+        this.memCountry.set(entry.host, entry.country);
+        if (entry.hostname) {
+          this.memHostname.set(entry.host, {
+            hostname: entry.hostname,
+            expiresAt: entry.expiresAt,
+          });
+        } else {
+          this.memHostname.delete(entry.host);
+        }
+      },
+      getCountry: (h) => this.getCountry(h),
+      ptrEnabled: this.ptrEnabled,
+      cacheTtlMs: this.cacheTtlMs,
+      adguardCacheTtlMs: this.adguardCacheTtlMs,
+      adguard: this.adguard,
+    });
   }
 
   async close(): Promise<void> {
+    this.adguard?.close();
     await this.pool.end();
   }
 }
