@@ -92,6 +92,16 @@ describe('aggregation', () => {
     );
   });
 
+  it('exposes src→dst TX and dst→src RX on hot flows', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    seed(store, now);
+    const dash = buildDashboard(store, '30s', now);
+    const https = dash.hotFlows.find((f) => f.dst === '1.1.1.1');
+    expect(https?.txBytes).toBe(1000);
+    expect(https?.rxBytes).toBe(9000);
+  });
+
   it('returns host-relative flows', () => {
     const store = new TrafficStore();
     const now = 1_800_000_000;

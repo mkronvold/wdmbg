@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { QueryWindow } from '@wdmbg/contracts';
+import type { FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contracts';
+import { WINDOW_SECONDS } from '@wdmbg/contracts';
 import { useState } from 'react';
 import { fetchHost, fetchHostFlows, putAlias, resolveHosts } from '../api/client';
 import { DataTable } from './DataTable';
-import { formatBps, formatBytes, hostLabel } from './format';
+import { formatMb, formatMbps, hostLabel, windowLegend } from './format';
 
 export interface HostDialogProps {
   host: string;
@@ -14,6 +15,8 @@ export interface HostDialogProps {
 export function HostDialog({ host, window, onClose }: HostDialogProps) {
   const qc = useQueryClient();
   const [aliasDraft, setAliasDraft] = useState('');
+  const secs = WINDOW_SECONDS[window];
+  const legend = windowLegend(window);
 
   const summary = useQuery({
     queryKey: ['host', host, window],
@@ -47,7 +50,10 @@ export function HostDialog({ host, window, onClose }: HostDialogProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="panel-head">
-          <h2>{hostLabel(host, summary.data?.label)}</h2>
+          <div className="panel-title-block">
+            <h2>{hostLabel(host, summary.data?.label)}</h2>
+            <p className="panel-legend">{legend}</p>
+          </div>
           <button type="button" className="copy-btn" onClick={onClose}>
             Close
           </button>
@@ -57,20 +63,24 @@ export function HostDialog({ host, window, onClose }: HostDialogProps) {
         {summary.data && (
           <dl className="status compact">
             <div>
-              <dt>TX</dt>
-              <dd>
-                {formatBytes(summary.data.txBytes)} ({formatBps(summary.data.txRateBps)})
-              </dd>
+              <dt>TX MB</dt>
+              <dd>{formatMb(summary.data.txBytes)}</dd>
             </div>
             <div>
-              <dt>RX</dt>
-              <dd>
-                {formatBytes(summary.data.rxBytes)} ({formatBps(summary.data.rxRateBps)})
-              </dd>
+              <dt>RX MB</dt>
+              <dd>{formatMb(summary.data.rxBytes)}</dd>
             </div>
             <div>
-              <dt>Total</dt>
-              <dd>{formatBytes(summary.data.totalBytes)}</dd>
+              <dt>Total MB</dt>
+              <dd>{formatMb(summary.data.totalBytes)}</dd>
+            </div>
+            <div>
+              <dt>TX Mbps</dt>
+              <dd>{formatMbps(summary.data.txBytes, secs)}</dd>
+            </div>
+            <div>
+              <dt>RX Mbps</dt>
+              <dd>{formatMbps(summary.data.rxBytes, secs)}</dd>
             </div>
           </dl>
         )}
@@ -104,39 +114,106 @@ export function HostDialog({ host, window, onClose }: HostDialogProps) {
         {summary.data && (
           <DataTable
             title="Top protocols"
+            legend={legend}
             rows={summary.data.topProtocols}
             columns={[
-              { key: 'p', header: 'Protocol', render: (r) => r.protocol },
-              { key: 'b', header: 'Bytes', render: (r) => formatBytes(r.bytes) },
-              { key: 'pk', header: 'Packets', render: (r) => r.packets },
+              { key: 'p', header: 'Protocol', render: (r: ProtocolRow) => r.protocol },
+              { key: 'b', header: 'MB', numeric: true, render: (r: ProtocolRow) => formatMb(r.bytes) },
+              {
+                key: 'pk',
+                header: 'Packets',
+                numeric: true,
+                render: (r: ProtocolRow) => r.packets,
+              },
             ]}
           />
         )}
         {summary.data && (
           <DataTable
             title="Top peers"
+            legend={legend}
             rows={summary.data.topPeers}
             columns={[
-              { key: 'h', header: 'Peer', render: (r) => hostLabel(r.host, r.label) },
-              { key: 'tx', header: 'TX', render: (r) => formatBytes(r.txBytes) },
-              { key: 'rx', header: 'RX', render: (r) => formatBytes(r.rxBytes) },
-              { key: 'c', header: 'Country', render: (r) => r.country ?? '—' },
+              {
+                key: 'h',
+                header: 'Peer',
+                cellClassName: 'cell-host',
+                render: (r: TalkerRow) => hostLabel(r.host, r.label),
+              },
+              {
+                key: 'tx',
+                header: 'TX MB',
+                numeric: true,
+                render: (r: TalkerRow) => formatMb(r.txBytes),
+              },
+              {
+                key: 'rx',
+                header: 'RX MB',
+                numeric: true,
+                render: (r: TalkerRow) => formatMb(r.rxBytes),
+              },
+              {
+                key: 'txr',
+                header: 'TX Mbps',
+                numeric: true,
+                render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
+              },
+              {
+                key: 'rxr',
+                header: 'RX Mbps',
+                numeric: true,
+                render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+              },
+              { key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' },
             ]}
           />
         )}
         {flows.data && (
           <DataTable
             title="Flows (host-relative)"
+            legend={legend}
             rows={flows.data.flows}
             columns={[
-              { key: 'src', header: 'Src', render: (r) => r.src },
-              { key: 'sp', header: 'SPort', render: (r) => r.srcPort },
-              { key: 'dst', header: 'Dst', render: (r) => r.dst },
-              { key: 'dp', header: 'DPort', render: (r) => r.dstPort },
-              { key: 'l4', header: 'L4', render: (r) => r.l4 },
-              { key: 'l7', header: 'L7', render: (r) => r.l7 ?? '—' },
-              { key: 'tx', header: 'TX', render: (r) => formatBytes(r.txBytes ?? 0) },
-              { key: 'rx', header: 'RX', render: (r) => formatBytes(r.rxBytes ?? 0) },
+              {
+                key: 'src',
+                header: 'Src',
+                cellClassName: 'cell-host',
+                render: (r: FlowRow) => r.src,
+              },
+              { key: 'sp', header: 'SPort', numeric: true, render: (r: FlowRow) => r.srcPort },
+              {
+                key: 'dst',
+                header: 'Dst',
+                cellClassName: 'cell-host',
+                render: (r: FlowRow) => r.dst,
+              },
+              { key: 'dp', header: 'DPort', numeric: true, render: (r: FlowRow) => r.dstPort },
+              { key: 'l4', header: 'L4', render: (r: FlowRow) => r.l4 },
+              { key: 'l7', header: 'L7', render: (r: FlowRow) => r.l7 ?? '—' },
+              {
+                key: 'tx',
+                header: 'TX MB',
+                numeric: true,
+                render: (r: FlowRow) => formatMb(r.txBytes ?? 0),
+              },
+              {
+                key: 'rx',
+                header: 'RX MB',
+                numeric: true,
+                render: (r: FlowRow) => formatMb(r.rxBytes ?? 0),
+              },
+              {
+                key: 'txr',
+                header: 'TX Mbps',
+                numeric: true,
+                render: (r: FlowRow) => formatMbps(r.txBytes ?? 0, secs),
+              },
+              {
+                key: 'rxr',
+                header: 'RX Mbps',
+                numeric: true,
+                render: (r: FlowRow) => formatMbps(r.rxBytes ?? 0, secs),
+              },
             ]}
           />
         )}

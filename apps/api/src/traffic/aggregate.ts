@@ -108,6 +108,10 @@ export function toFlowRow(flow: StoredFlow, host?: string): FlowRow {
       row.txBytes = rel.txBytes;
       row.rxBytes = rel.rxBytes;
     }
+  } else {
+    // Hot flows (no host context): TX = src→dst, RX = dst→src.
+    row.txBytes = flow.bytesSrcToDst;
+    row.rxBytes = flow.bytesDstToSrc;
   }
   return row;
 }
