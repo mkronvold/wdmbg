@@ -41,7 +41,26 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:5173 pnpm test:e2e
 PLAYWRIGHT_BASE_URL=http://wdmbg.lan pnpm test:e2e
 ```
 
-### When this machine cannot resolve `wdmbg.lan`
+### Preferred: run on `docker.lan` (host network)
+
+When the agent/workstation lacks `*.lan` DNS or Node, execute on the app host over SSH. `docker.lan` resolves `wdmbg.lan` and reaches NPM on the host network. If the host has no Node, use the official Playwright image (version should match the lockfile, currently **1.62.x**):
+
+```bash
+ssh mkronvold@docker.lan
+cd ~/src/wdmbg   # checkout/PR branch with apps/e2e
+# Gate:
+curl -fsS http://wdmbg.lan/api/health
+
+docker run --rm --network host \
+  -v "$PWD:/work" -w /work \
+  -e PLAYWRIGHT_BASE_URL=http://wdmbg.lan \
+  mcr.microsoft.com/playwright:v1.62.1-jammy \
+  bash -lc 'corepack enable && corepack prepare pnpm@10.33.0 --activate \
+    && pnpm install --filter @wdmbg/e2e... \
+    && pnpm --filter @wdmbg/e2e exec playwright test'
+```
+
+### When this machine cannot resolve `wdmbg.lan` (local runner)
 
 If NPM is already up (e.g. at `docker.lan` / `10.0.0.202`) but AdGuard has not published `wdmbg.lan` yet, map the hostname for Chromium and the API request helper:
 
