@@ -22,9 +22,14 @@ Suggested layout after checkout:
 
 ```text
 ~/src/wdmbg/
-  deploy/compose/   # compose.prod.yml, images.env, up.sh, down.sh
+  deploy/compose/   # compose.prod.yml, images.env, up.sh, down.sh, autoupdate.sh
   deploy/env/       # .env (secrets), api.env
 ```
+
+After the stack is up, install GHCR auto-refresh (`./autoupdate.sh --once` every ~30m)
+via cron or systemd timer. Details: [DOCKER.md](./DOCKER.md#install-auto-refresh-on-dockerlan).
+Compose already uses `restart: unless-stopped`; keep Docker enabled on boot so the
+stack returns after reboot.
 
 ## Networking (locked)
 
