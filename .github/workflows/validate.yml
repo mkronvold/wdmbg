@@ -51,6 +51,13 @@ jobs:
           go-version-file: apps/probe/go.mod
           cache-dependency-path: apps/probe/go.sum
 
+      - name: Install libpcap (linux probe build)
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+
       - name: Probe tests
         working-directory: apps/probe
         run: go test ./...
+
+      - name: Probe linux build
+        working-directory: apps/probe
+        run: go build -o /tmp/wdmbg-probe .

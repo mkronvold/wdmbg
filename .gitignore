@@ -29,3 +29,8 @@ Thumbs.db
 apps/probe/wdmbg-probe
 apps/probe/wdmbg-probe.exe
 apps/probe/bin/
+
+deploy/compose/logs/
+deploy/env/.env
+deploy/env/api.env
+

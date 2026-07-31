@@ -10,9 +10,15 @@ EnvironmentFile=-/etc/wdmbg/probe.env
 ExecStart=/usr/local/bin/wdmbg-probe
 Restart=on-failure
 RestartSec=5
-# Capture may need elevated capabilities; tighten in a later phase.
-# AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
-# NoNewPrivileges=true
+# Capture needs raw packet access on the bridge/tap.
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+# Harden lightly; adjust if capture fails on your kernel.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log
 
 [Install]
 WantedBy=multi-user.target

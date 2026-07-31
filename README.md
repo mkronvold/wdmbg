@@ -3,16 +3,16 @@
 Lightweight **passive traffic monitor** for a home / LAN lab:
 
 - **Go probe** on Proxmox (host-native + systemd)
-- **Fastify API** (TypeScript) for ingest and metadata
-- **React dashboard** for live and historical views
+- **Fastify API** (TypeScript) for ingest, query, and metadata
+- **React dashboard** for live sliding windows
 
 This repository follows the product-app profile from
 [`mkronvold/techstack`](https://github.com/mkronvold/techstack).
 
 ## Status
 
-**Phase 0 scaffold** — monorepo layout, health endpoint, web shell, shared packages,
-Go probe stub, CI validate skeleton. No capture pipeline yet.
+**MVP Phases 1–6** — contracts + ingest ring, Go probe, query API + live WS, dashboard UI,
+Postgres metadata + enrichment hooks, home compose/deploy docs.
 
 ## MVP decisions (locked)
 
@@ -20,11 +20,12 @@ Go probe stub, CI validate skeleton. No capture pipeline yet.
 | --- | --- |
 | Worker | None in MVP |
 | Auth | None (LAN-trusted) |
-| Live traffic | 15-minute **in-memory** buffer in the API (not durable) |
-| Probe → API | HTTP `POST` JSON batches |
-| Probe runtime | Go, host-native + systemd only (not containerized in MVP) |
-| Metadata store | Postgres + `pg` (dependency/scaffold only in Phase 0) |
-| L7 | Ports + DNS correlation later; nDPI deferred |
+| Live traffic | 15-minute **in-memory** 1s buckets in the API |
+| Windows | `5s` \| `30s` \| `5m` |
+| Probe → API | HTTP `POST` JSON rollups → `/api/ingest/rollups` |
+| Probe runtime | Go, host-native + systemd only (not containerized) |
+| Metadata store | Postgres + `pg` (aliases, lookup_cache, settings) |
+| L7 | Port heuristics; nDPI deferred |
 | Registry | Home profile — GHCR (`ghcr.io/mkronvold/...`) |
 | App host | `docker.lan` (`10.0.0.202`) → `~/src/wdmbg`, NPM + `wdmbg.lan` |
 | Probe host | `proxbox1` / `proxmox1` (`10.0.0.193`) host-native + systemd |
@@ -33,12 +34,13 @@ Go probe stub, CI validate skeleton. No capture pipeline yet.
 
 ```
 apps/api          Fastify + TypeScript API
-apps/web          React 19 + Vite dashboard shell
-apps/probe        Go probe module (skeleton)
+apps/web          React 19 + Vite dashboard
+apps/probe        Go probe (pcap linux + simulate)
 packages/contracts  Shared Zod schemas
 packages/config     Shared env / defaults
-deploy/proxbox1   systemd unit + env stubs (docs only)
-docs/             Thin ops docs (deltas vs techstack)
+deploy/compose    compose.prod.yml, up.sh/down.sh, images.env
+deploy/proxbox1   systemd unit + env examples
+docs/             Ops docs (deltas vs techstack)
 ```
 
 ## Prerequisites
@@ -46,6 +48,7 @@ docs/             Thin ops docs (deltas vs techstack)
 - Node **26** (see `.node-version` / `engines`)
 - [Corepack](https://nodejs.org/api/corepack.html) + **pnpm@10.x**
 - Go **1.25+** (for `apps/probe`)
+- libpcap (Linux capture builds only)
 
 ## Quick start
 
@@ -57,44 +60,37 @@ corepack pnpm dev
 
 - Web: http://localhost:5173  
 - API health: http://localhost:4080/health  
+- Dashboard API: http://localhost:4080/api/dashboard?window=30s  
 
-Probe stub:
+Probe simulate:
 
 ```bash
 cd apps/probe
-go run . -version
-go run . -help
+go test ./...
+go run . -simulate -once -ingest-url http://127.0.0.1:4080/api/ingest/rollups
 ```
 
 ## Validate
 
-Same gate CI runs:
-
 ```bash
 corepack pnpm validate
-# or stepwise:
-corepack pnpm lint
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
-corepack pnpm format:check
+cd apps/probe && go test ./...
 ```
 
 ## Docs
 
 | Doc | Purpose |
 | --- | --- |
-| [docs/CI.md](docs/CI.md) | Validation / future publish |
+| [docs/CI.md](docs/CI.md) | Validation / publish |
 | [docs/LCM.md](docs/LCM.md) | Lifecycle / GHCR home profile |
-| [docs/DOCKER.md](docs/DOCKER.md) | Compose topology (web on proxy-net only) |
-| [docs/DEPLOY-HOME.md](docs/DEPLOY-HOME.md) | docker.lan + proxbox1 targets (locked) |
+| [docs/DOCKER.md](docs/DOCKER.md) | Compose topology |
+| [docs/DEPLOY-HOME.md](docs/DEPLOY-HOME.md) | docker.lan + proxbox1 runbook |
+| [docs/PROBE.md](docs/PROBE.md) | Go probe |
+| [docs/ENRICHMENT.md](docs/ENRICHMENT.md) | PTR / GeoIP / country rules |
 | [docs/GITHUB-SETUP.md](docs/GITHUB-SETUP.md) | Repo settings checklist |
-| [docs/PROBE.md](docs/PROBE.md) | Go probe on proxbox1 + ingest URL |
 | [security/exceptions.md](security/exceptions.md) | Temporary baseline exceptions |
-
-Baseline policy lives in the techstack repo; these docs only list **WDMBG deltas**.
 
 ## Themes
 
-`@mkronvold/themes` is not wired yet (not installable in this scaffold). The web app
-uses interim CSS variables — see `security/exceptions.md`.
+`@mkronvold/themes` is not wired yet. The web app uses interim CSS variables —
+see `security/exceptions.md`.
