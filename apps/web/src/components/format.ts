@@ -55,5 +55,5 @@ export function hostLabel(host: string, label?: string): string {
 }
 
 export function windowLegend(windowLabel: string): string {
-  return `Window ${windowLabel} · Totals in MB · Rates in Mbps`;
+  return `last ${windowLabel} · Totals in MB · Rates in Mbps`;
 }

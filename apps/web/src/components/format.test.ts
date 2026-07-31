@@ -36,9 +36,7 @@ describe('formatBytes', () => {
 });
 
 describe('windowLegend', () => {
-  it('mentions window and units', () => {
-    expect(windowLegend('30s')).toContain('30s');
-    expect(windowLegend('30s')).toContain('MB');
-    expect(windowLegend('30s')).toContain('Mbps');
+  it('uses last-window wording and units', () => {
+    expect(windowLegend('30s')).toBe('last 30s · Totals in MB · Rates in Mbps');
   });
 });

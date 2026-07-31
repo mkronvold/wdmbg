@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
+import * as client from './api/client';
+import { THEME_STORAGE_KEY } from './theme';
 
 vi.stubGlobal(
   'WebSocket',
@@ -69,8 +71,20 @@ vi.mock('./api/client', () => ({
   resolveHosts: vi.fn(),
 }));
 
+function renderApp() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>,
+  );
+}
+
 describe('App', () => {
   beforeEach(() => {
+    cleanup();
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (k: string) => store.get(k) ?? null,
@@ -82,65 +96,125 @@ describe('App', () => {
       },
       clear: () => store.clear(),
     });
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
+    document.documentElement.removeAttribute('data-theme');
+    vi.mocked(client.fetchDashboard).mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('renders the WDMBG shell and window controls', async () => {
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={client}>
-        <App />
-      </QueryClientProvider>,
-    );
-    expect(screen.getByRole('heading', { level: 1, name: 'WDMBG' })).toBeInTheDocument();
-    expect(screen.getByText('Where did my bandwidth go?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '30s' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '15m' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '1h' })).toBeInTheDocument();
+    const { container } = renderApp();
+    const view = within(container);
+    expect(view.getByRole('heading', { level: 1, name: 'WDMBG' })).toBeInTheDocument();
+    expect(view.getByText('Where did my bandwidth go?')).toBeInTheDocument();
+    expect(view.getByText('Traffic window')).toBeInTheDocument();
+    expect(view.getByRole('group', { name: 'Traffic window' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: '30s' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: '15m' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: '1h' })).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
-    expect(screen.getAllByText(/Window 30s/).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('columnheader', { name: 'TX Mbps' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('columnheader', { name: 'TX MB' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
+    expect(view.getAllByText(/last 30s/).length).toBeGreaterThan(0);
+    expect(view.getAllByRole('columnheader', { name: 'TX Mbps' }).length).toBeGreaterThan(0);
+    expect(view.getAllByRole('columnheader', { name: 'TX MB' }).length).toBeGreaterThan(0);
+    expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+    expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
   });
 
   it('opens host details from hot flow Src/Dst IPs', async () => {
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={client}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { container } = renderApp();
+    const view = within(container);
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
     });
 
     // Dst IP on Hot flows
-    fireEvent.click(screen.getByRole('button', { name: '1.1.1.1' }));
-    expect(await screen.findByRole('dialog', { name: /Host 1\.1\.1\.1/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(view.getByRole('button', { name: '1.1.1.1' }));
+    expect(await view.findByRole('dialog', { name: /Host 1\.1\.1\.1/i })).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Close' }));
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(view.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     // Src IP on Hot flows (same address may also appear as talker host label)
-    const srcButtons = screen.getAllByRole('button', { name: '10.0.0.10' });
+    const srcButtons = view.getAllByRole('button', { name: '10.0.0.10' });
     expect(srcButtons.length).toBeGreaterThan(0);
     fireEvent.click(srcButtons[srcButtons.length - 1]!);
-    expect(await screen.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
+    expect(await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
 
     // Talker host label still opens the same HostDialog
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(view.getByRole('button', { name: 'Close' }));
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(view.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    fireEvent.click(screen.getAllByRole('button', { name: 'laptop' })[0]!);
-    expect(await screen.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
+    fireEvent.click(view.getAllByRole('button', { name: 'laptop' })[0]!);
+    expect(await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Close' }));
+  });
+
+  it('toggles theme and persists preference', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe('dark');
+    });
+
+    fireEvent.click(view.getByRole('button', { name: 'Switch to light theme' }));
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    expect(view.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
+
+    fireEvent.click(view.getByRole('button', { name: 'Switch to dark theme' }));
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+  });
+
+  it('restores stored theme preference on load', async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe('light');
+    });
+    expect(view.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
+  });
+
+  it('pauses dashboard refetching and shows paused state', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    const callsAfterMount = vi.mocked(client.fetchDashboard).mock.calls.length;
+    expect(callsAfterMount).toBeGreaterThan(0);
+
+    fireEvent.click(view.getByRole('button', { name: 'Pause updates' }));
+    expect(view.getByText('Paused')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Resume updates' })).toBeInTheDocument();
+
+    // Live interval is 2s; wait past a few ticks with real timers while paused.
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    expect(vi.mocked(client.fetchDashboard).mock.calls.length).toBe(callsAfterMount);
+
+    fireEvent.click(view.getByRole('button', { name: 'Resume updates' }));
+    expect(view.queryByText('Paused')).not.toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Pause updates' })).toBeInTheDocument();
   });
 });
