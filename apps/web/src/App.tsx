@@ -6,6 +6,7 @@ import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
+import { applyTheme, persistTheme, resolveInitialTheme, type Theme } from './theme';
 
 const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
@@ -62,6 +63,12 @@ export function App() {
   const [cardOrder, setCardOrder] = useState<CardId[]>(() => loadCardOrder());
   const [draggingId, setDraggingId] = useState<CardId | null>(null);
   const [dragOverId, setDragOverId] = useState<CardId | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [theme, setTheme] = useState<Theme>(() => resolveInitialTheme());
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   const health = useQuery({
     queryKey: ['health'],
@@ -73,10 +80,12 @@ export function App() {
   const dashboard = useQuery({
     queryKey: ['dashboard', window],
     queryFn: () => fetchDashboard(window),
-    refetchInterval: 2_000,
+    refetchInterval: paused ? false : 2_000,
   });
 
   useEffect(() => {
+    if (paused) return;
+
     let ws: WebSocket | null = null;
     let closed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
@@ -104,7 +113,9 @@ export function App() {
         }
       };
       ws.onclose = () => {
-        retry = setTimeout(connect, 3000);
+        if (!closed) {
+          retry = setTimeout(connect, 3000);
+        }
       };
     };
     connect();
@@ -113,10 +124,19 @@ export function App() {
       if (retry) clearTimeout(retry);
       ws?.close();
     };
-  }, []);
+  }, [paused]);
 
   const selectHost = useCallback((host: string) => {
     setSelectedHost(host);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next: Theme = prev === 'dark' ? 'light' : 'dark';
+      persistTheme(next);
+      applyTheme(next);
+      return next;
+    });
   }, []);
 
   const secs = WINDOW_SECONDS[window];
@@ -355,21 +375,60 @@ export function App() {
           <p className="subtitle">Where did my bandwidth go?</p>
         </div>
         <div className="hero-meta">
-          <div className="window-toggle" role="group" aria-label="Time window">
-            {WINDOWS.map((w) => (
-              <button
-                key={w}
-                type="button"
-                className={w === window ? 'primary' : 'copy-btn'}
-                onClick={() => setWindow(w)}
+          <div className="hero-controls">
+            <button
+              type="button"
+              className="copy-btn icon-btn"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+            >
+              {theme === 'dark' ? '☀' : '☽'}
+            </button>
+            <button
+              type="button"
+              className="copy-btn icon-btn"
+              onClick={() => setPaused((p) => !p)}
+              aria-label={paused ? 'Resume updates' : 'Pause updates'}
+              title={paused ? 'Resume updates' : 'Pause updates'}
+            >
+              {paused ? '▶' : '⏸'}
+            </button>
+            <div className="window-control">
+              <p className="window-label" id="traffic-window-label">
+                Traffic window
+              </p>
+              <div
+                className="window-toggle"
+                role="group"
+                aria-labelledby="traffic-window-label"
+                aria-label="Traffic window"
               >
-                {w}
-              </button>
-            ))}
+                {WINDOWS.map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    className={w === window ? 'primary' : 'copy-btn'}
+                    onClick={() => setWindow(w)}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <p className="muted small">
             API: {health.data?.status ?? (health.isError ? 'down' : '…')}
-            {live ? ` · live ${formatBytes(live.totalBytes)} / ${live.flowCount} flows` : ''}
+            {paused ? (
+              <>
+                {' · '}
+                <span className="paused-badge">Paused</span>
+              </>
+            ) : live ? (
+              ` · live ${formatBytes(live.totalBytes)} / ${live.flowCount} flows`
+            ) : (
+              ''
+            )}
           </p>
         </div>
       </header>

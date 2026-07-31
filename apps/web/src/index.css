@@ -1,4 +1,5 @@
-:root {
+:root,
+[data-theme='dark'] {
   color-scheme: dark;
   --bg: #0b1020;
   --bg-elevated: #141b2f;
@@ -8,6 +9,8 @@
   --border: #24314f;
   --ok: #3dd68c;
   --danger: #ff7b72;
+  --hero-glow: #16213f;
+  --modal-scrim: rgba(4, 8, 18, 0.72);
   font-family:
     Inter,
     ui-sans-serif,
@@ -21,7 +24,21 @@
   line-height: 1.5;
   font-weight: 400;
   color: var(--fg);
-  background: radial-gradient(circle at top, #16213f 0%, var(--bg) 55%);
+  background: radial-gradient(circle at top, var(--hero-glow) 0%, var(--bg) 55%);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f7fb;
+  --bg-elevated: #ffffff;
+  --fg: #142033;
+  --muted: #5b6b86;
+  --accent: #2563eb;
+  --border: #d5deec;
+  --ok: #0f9f6e;
+  --danger: #d64545;
+  --hero-glow: #dbe7ff;
+  --modal-scrim: rgba(15, 23, 42, 0.45);
 }
 
 * {
@@ -31,6 +48,8 @@
 body {
   margin: 0;
   min-height: 100vh;
+  color: var(--fg);
+  background: radial-gradient(circle at top, var(--hero-glow) 0%, var(--bg) 55%);
 }
 
 #root {
@@ -82,12 +101,46 @@ body {
   justify-items: end;
 }
 
+.hero-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.window-control {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: end;
+}
+
+.window-label {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
 .window-toggle {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   justify-content: flex-end;
   max-width: 22rem;
+}
+
+.icon-btn {
+  min-width: 2.25rem;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.paused-badge {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 .small {
@@ -299,7 +352,7 @@ th {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(4, 8, 18, 0.72);
+  background: var(--modal-scrim);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -346,5 +399,15 @@ code {
 
   td.cell-host {
     max-width: 8rem;
+  }
+
+  .hero-meta,
+  .window-control {
+    justify-items: start;
+  }
+
+  .hero-controls,
+  .window-toggle {
+    justify-content: flex-start;
   }
 }
