@@ -46,7 +46,7 @@ jobs:
         run: corepack pnpm format:check
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: apps/probe/go.mod
           cache-dependency-path: apps/probe/go.sum
