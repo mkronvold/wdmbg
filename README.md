@@ -106,5 +106,12 @@ Runner must resolve `wdmbg.lan` (lab DNS). On Windows without `.lan` DNS, SSH to
 
 ## Themes
 
-`@mkronvold/themes` is not wired yet. The web app uses interim CSS variables —
-see `security/exceptions.md`.
+Dashboard colors come from the shared [`mkronvold/themes`](https://github.com/mkronvold/themes)
+token set. Because `@mkronvold/themes` is not published to npm, `theme.css` is **vendored** at
+[`apps/web/src/styles/theme.css`](apps/web/src/styles/theme.css) (with upstream attribution).
+
+- CSS uses canonical `--theme-*` variables and `data-theme="<id>"` on `<html>`.
+- Preference is stored as a theme **id** in `localStorage` key `wdmbg.theme`.
+- Default: stored id → else `prefers-color-scheme` (`light` / `midnight`).
+- Legacy `dark` (and other aliases from upstream) normalize to canonical ids.
+- Refresh the vendor file from upstream `theme.css` when tokens change; do not hand-edit values.

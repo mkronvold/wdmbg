@@ -168,21 +168,22 @@ describe('App', () => {
     fireEvent.click(view.getByRole('button', { name: 'Close' }));
   });
 
-  it('toggles theme and persists preference', async () => {
+  it('changes theme via select and persists preference', async () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(document.documentElement.dataset.theme).toBe('dark');
+      expect(document.documentElement.dataset.theme).toBe('midnight');
     });
 
-    fireEvent.click(view.getByRole('button', { name: 'Switch to light theme' }));
-    expect(document.documentElement.dataset.theme).toBe('light');
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
-    expect(view.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
+    const select = view.getByRole('combobox', { name: 'Color theme' });
+    fireEvent.change(select, { target: { value: 'ocean' } });
+    expect(document.documentElement.dataset.theme).toBe('ocean');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('ocean');
+    expect((select as HTMLSelectElement).value).toBe('ocean');
 
-    fireEvent.click(view.getByRole('button', { name: 'Switch to dark theme' }));
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
+    fireEvent.change(select, { target: { value: 'sunshower' } });
+    expect(document.documentElement.dataset.theme).toBe('sunshower');
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('sunshower');
   });
 
   it('restores stored theme preference on load', async () => {
@@ -192,7 +193,20 @@ describe('App', () => {
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe('light');
     });
-    expect(view.getByRole('button', { name: 'Switch to dark theme' })).toBeInTheDocument();
+    const select = view.getByRole('combobox', { name: 'Color theme' }) as HTMLSelectElement;
+    expect(select.value).toBe('light');
+  });
+
+  it('normalizes legacy dark storage to midnight', async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe('midnight');
+    });
+    expect((view.getByRole('combobox', { name: 'Color theme' }) as HTMLSelectElement).value).toBe(
+      'midnight',
+    );
   });
 
   it('pauses dashboard refetching and shows paused state', async () => {
