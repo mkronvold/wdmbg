@@ -138,23 +138,26 @@ export function App() {
     setDragOverId((cur) => (cur === cardId ? null : cur));
   }, []);
 
-  const onDrop = useCallback((event: DragEvent<HTMLElement>, targetId: string) => {
-    event.preventDefault();
-    const sourceId = (event.dataTransfer.getData('text/plain') || draggingId) as CardId | null;
-    setDragOverId(null);
-    setDraggingId(null);
-    if (!sourceId || sourceId === targetId) return;
-    setCardOrder((prev) => {
-      const next = [...prev];
-      const from = next.indexOf(sourceId);
-      const to = next.indexOf(targetId as CardId);
-      if (from < 0 || to < 0) return prev;
-      next.splice(from, 1);
-      next.splice(to, 0, sourceId);
-      saveCardOrder(next);
-      return next;
-    });
-  }, [draggingId]);
+  const onDrop = useCallback(
+    (event: DragEvent<HTMLElement>, targetId: string) => {
+      event.preventDefault();
+      const sourceId = (event.dataTransfer.getData('text/plain') || draggingId) as CardId | null;
+      setDragOverId(null);
+      setDraggingId(null);
+      if (!sourceId || sourceId === targetId) return;
+      setCardOrder((prev) => {
+        const next = [...prev];
+        const from = next.indexOf(sourceId);
+        const to = next.indexOf(targetId as CardId);
+        if (from < 0 || to < 0) return prev;
+        next.splice(from, 1);
+        next.splice(to, 0, sourceId);
+        saveCardOrder(next);
+        return next;
+      });
+    },
+    [draggingId],
+  );
 
   const onDragEnd = useCallback(() => {
     setDraggingId(null);
@@ -189,8 +192,18 @@ export function App() {
             render: (r: TalkerRow) => r.label ?? r.host,
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
-          { key: 'tx', header: 'TX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.txBytes) },
-          { key: 'rx', header: 'RX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.rxBytes) },
+          {
+            key: 'tx',
+            header: 'TX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.txBytes),
+          },
+          {
+            key: 'rx',
+            header: 'RX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.rxBytes),
+          },
           {
             key: 'txr',
             header: 'TX Mbps',
@@ -225,8 +238,18 @@ export function App() {
             render: (r: TalkerRow) => r.label ?? r.host,
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
-          { key: 'rx', header: 'RX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.rxBytes) },
-          { key: 'tx', header: 'TX MB', numeric: true, render: (r: TalkerRow) => formatMb(r.txBytes) },
+          {
+            key: 'rx',
+            header: 'RX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.rxBytes),
+          },
+          {
+            key: 'tx',
+            header: 'TX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.txBytes),
+          },
           {
             key: 'rxr',
             header: 'RX Mbps',
@@ -355,9 +378,7 @@ export function App() {
         <p className="muted">Dashboard unavailable — start the API or check the /api proxy.</p>
       )}
 
-      {dashboard.data && (
-        <div className="grid">{cardOrder.map((id) => cards[id])}</div>
-      )}
+      {dashboard.data && <div className="grid">{cardOrder.map((id) => cards[id])}</div>}
 
       {selectedHost && (
         <HostDialog host={selectedHost} window={window} onClose={() => setSelectedHost(null)} />

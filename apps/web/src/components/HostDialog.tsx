@@ -118,7 +118,12 @@ export function HostDialog({ host, window, onClose }: HostDialogProps) {
             rows={summary.data.topProtocols}
             columns={[
               { key: 'p', header: 'Protocol', render: (r: ProtocolRow) => r.protocol },
-              { key: 'b', header: 'MB', numeric: true, render: (r: ProtocolRow) => formatMb(r.bytes) },
+              {
+                key: 'b',
+                header: 'MB',
+                numeric: true,
+                render: (r: ProtocolRow) => formatMb(r.bytes),
+              },
               {
                 key: 'pk',
                 header: 'Packets',

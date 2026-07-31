@@ -11,7 +11,12 @@ export function formatMb(bytes: number): string {
 
 /** Megabits/sec from window byte total: (bytes * 8) / seconds / 1e6. */
 export function rateMbps(bytes: number, windowSeconds: number): number {
-  if (!Number.isFinite(bytes) || bytes < 0 || !Number.isFinite(windowSeconds) || windowSeconds <= 0) {
+  if (
+    !Number.isFinite(bytes) ||
+    bytes < 0 ||
+    !Number.isFinite(windowSeconds) ||
+    windowSeconds <= 0
+  ) {
     return 0;
   }
   return (bytes * 8) / windowSeconds / 1e6;
