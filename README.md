@@ -26,6 +26,8 @@ Go probe stub, CI validate skeleton. No capture pipeline yet.
 | Metadata store | Postgres + `pg` (dependency/scaffold only in Phase 0) |
 | L7 | Ports + DNS correlation later; nDPI deferred |
 | Registry | Home profile — GHCR (`ghcr.io/mkronvold/...`) |
+| App host | `docker.lan` (`10.0.0.202`) → `~/src/wdmbg`, NPM + `wdmbg.lan` |
+| Probe host | `proxbox1` / `proxmox1` (`10.0.0.193`) host-native + systemd |
 
 ## Workspace layout
 
@@ -35,6 +37,7 @@ apps/web          React 19 + Vite dashboard shell
 apps/probe        Go probe module (skeleton)
 packages/contracts  Shared Zod schemas
 packages/config     Shared env / defaults
+deploy/proxbox1   systemd unit + env stubs (docs only)
 docs/             Thin ops docs (deltas vs techstack)
 ```
 
@@ -83,9 +86,10 @@ corepack pnpm format:check
 | --- | --- |
 | [docs/CI.md](docs/CI.md) | Validation / future publish |
 | [docs/LCM.md](docs/LCM.md) | Lifecycle / GHCR home profile |
-| [docs/DOCKER.md](docs/DOCKER.md) | Container notes (API/web later; probe host-native) |
+| [docs/DOCKER.md](docs/DOCKER.md) | Compose topology (web on proxy-net only) |
+| [docs/DEPLOY-HOME.md](docs/DEPLOY-HOME.md) | docker.lan + proxbox1 targets (locked) |
 | [docs/GITHUB-SETUP.md](docs/GITHUB-SETUP.md) | Repo settings checklist |
-| [docs/PROBE.md](docs/PROBE.md) | Go probe delta + systemd intent |
+| [docs/PROBE.md](docs/PROBE.md) | Go probe on proxbox1 + ingest URL |
 | [security/exceptions.md](security/exceptions.md) | Temporary baseline exceptions |
 
 Baseline policy lives in the techstack repo; these docs only list **WDMBG deltas**.

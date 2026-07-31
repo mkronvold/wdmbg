@@ -1,0 +1,18 @@
+[Unit]
+Description=WDMBG passive traffic probe
+Documentation=https://github.com/mkronvold/wdmbg/blob/main/docs/PROBE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/wdmbg/probe.env
+ExecStart=/usr/local/bin/wdmbg-probe
+Restart=on-failure
+RestartSec=5
+# Capture may need elevated capabilities; tighten in a later phase.
+# AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+# NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
