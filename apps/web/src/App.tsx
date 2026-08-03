@@ -8,7 +8,15 @@ import type {
   TrafficBucket,
 } from '@wdmbg/contracts';
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
 import {
   collectUnnamedFromDashboard,
@@ -21,6 +29,7 @@ import { reorderCards, segmentVisibleCards } from './cardOrder';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
+import { UrlCard } from './components/UrlCard';
 import {
   THEME_IDS,
   THEME_LABELS,
@@ -29,6 +38,22 @@ import {
   resolveInitialTheme,
   type ThemeId,
 } from './theme';
+import {
+  DEFAULT_URL_CARD_HEIGHT_REM,
+  MAX_URL_CARD_HEIGHT_REM,
+  MIN_URL_CARD_HEIGHT_REM,
+  clampHeightRem,
+  filterKnownIds,
+  isAllowedDashboardUrl,
+  isUrlCardId,
+  knownDashboardIds,
+  loadUrlCards,
+  mergeCardOrder,
+  mintUrlCardId,
+  saveUrlCards,
+  type UrlCardDef,
+  type UrlCardId,
+} from './urlCards';
 
 const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
@@ -52,7 +77,8 @@ const DEFAULT_CARD_ORDER = [
 
 type SummaryRow = { bucket: 'Local' | 'Internet' } & TrafficBucket;
 
-type CardId = (typeof DEFAULT_CARD_ORDER)[number];
+type BuiltinCardId = (typeof DEFAULT_CARD_ORDER)[number];
+type DashboardCardId = BuiltinCardId | UrlCardId;
 
 const DISPLAY_REFRESH_OPTIONS = [
   { id: 'pause', label: 'Pause', ms: null as number | null },
@@ -66,31 +92,25 @@ const DISPLAY_REFRESH_OPTIONS = [
 
 type DisplayRefreshId = (typeof DISPLAY_REFRESH_OPTIONS)[number]['id'];
 
-function loadCardOrder(): CardId[] {
+function readJsonLocal(key: string): unknown {
   try {
-    const raw = localStorage.getItem(CARD_ORDER_KEY);
-    if (!raw) return [...DEFAULT_CARD_ORDER];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [...DEFAULT_CARD_ORDER];
-    const known = new Set<string>(DEFAULT_CARD_ORDER);
-    const seen = new Set<string>();
-    const ordered: CardId[] = [];
-    for (const id of parsed) {
-      if (typeof id === 'string' && known.has(id) && !seen.has(id)) {
-        ordered.push(id as CardId);
-        seen.add(id);
-      }
-    }
-    for (const id of DEFAULT_CARD_ORDER) {
-      if (!seen.has(id)) ordered.push(id);
-    }
-    return ordered;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as unknown;
   } catch {
-    return [...DEFAULT_CARD_ORDER];
+    return null;
   }
 }
 
-function saveCardOrder(order: CardId[]) {
+function loadCardOrder(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
+  return mergeCardOrder(
+    readJsonLocal(CARD_ORDER_KEY),
+    DEFAULT_CARD_ORDER,
+    urlCards,
+  ) as DashboardCardId[];
+}
+
+function saveCardOrder(order: DashboardCardId[]) {
   try {
     localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(order));
   } catch {
@@ -98,28 +118,16 @@ function saveCardOrder(order: CardId[]) {
   }
 }
 
-function loadHiddenCards(): CardId[] {
-  try {
-    const raw = localStorage.getItem(HIDDEN_CARDS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    const known = new Set<string>(DEFAULT_CARD_ORDER);
-    const seen = new Set<string>();
-    const hidden: CardId[] = [];
-    for (const id of parsed) {
-      if (typeof id === 'string' && known.has(id) && !seen.has(id)) {
-        hidden.push(id as CardId);
-        seen.add(id);
-      }
-    }
-    return hidden;
-  } catch {
-    return [];
-  }
+function loadIdList(key: string, urlCards: readonly UrlCardDef[]): DashboardCardId[] {
+  const known = knownDashboardIds(DEFAULT_CARD_ORDER, urlCards);
+  return filterKnownIds(readJsonLocal(key), known) as DashboardCardId[];
 }
 
-function saveHiddenCards(ids: CardId[]) {
+function loadHiddenCards(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
+  return loadIdList(HIDDEN_CARDS_KEY, urlCards);
+}
+
+function saveHiddenCards(ids: DashboardCardId[]) {
   try {
     localStorage.setItem(HIDDEN_CARDS_KEY, JSON.stringify(ids));
   } catch {
@@ -127,28 +135,11 @@ function saveHiddenCards(ids: CardId[]) {
   }
 }
 
-function loadWideCards(): CardId[] {
-  try {
-    const raw = localStorage.getItem(WIDE_CARDS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    const known = new Set<string>(DEFAULT_CARD_ORDER);
-    const seen = new Set<string>();
-    const wide: CardId[] = [];
-    for (const id of parsed) {
-      if (typeof id === 'string' && known.has(id) && !seen.has(id)) {
-        wide.push(id as CardId);
-        seen.add(id);
-      }
-    }
-    return wide;
-  } catch {
-    return [];
-  }
+function loadWideCards(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
+  return loadIdList(WIDE_CARDS_KEY, urlCards);
 }
 
-function saveWideCards(ids: CardId[]) {
+function saveWideCards(ids: DashboardCardId[]) {
   try {
     localStorage.setItem(WIDE_CARDS_KEY, JSON.stringify(ids));
   } catch {
@@ -266,12 +257,24 @@ export function App() {
   const [live, setLive] = useState<{ t: number; totalBytes: number; flowCount: number } | null>(
     null,
   );
-  const [cardOrder, setCardOrder] = useState<CardId[]>(() => loadCardOrder());
-  const [hiddenCards, setHiddenCards] = useState<CardId[]>(() => loadHiddenCards());
-  const [wideCards, setWideCards] = useState<CardId[]>(() => loadWideCards());
+  const [urlCards, setUrlCards] = useState<UrlCardDef[]>(() => loadUrlCards());
+  const [cardOrder, setCardOrder] = useState<DashboardCardId[]>(() =>
+    loadCardOrder(loadUrlCards()),
+  );
+  const [hiddenCards, setHiddenCards] = useState<DashboardCardId[]>(() =>
+    loadHiddenCards(loadUrlCards()),
+  );
+  const [wideCards, setWideCards] = useState<DashboardCardId[]>(() =>
+    loadWideCards(loadUrlCards()),
+  );
   const [editMode, setEditMode] = useState(false);
-  const [draggingId, setDraggingId] = useState<CardId | null>(null);
-  const [dragOverId, setDragOverId] = useState<CardId | null>(null);
+  const [draggingId, setDraggingId] = useState<DashboardCardId | null>(null);
+  const [dragOverId, setDragOverId] = useState<DashboardCardId | null>(null);
+  const [addingUrlCard, setAddingUrlCard] = useState(false);
+  const [addTitle, setAddTitle] = useState('');
+  const [addUrl, setAddUrl] = useState('');
+  const [addHeight, setAddHeight] = useState(String(DEFAULT_URL_CARD_HEIGHT_REM));
+  const [addError, setAddError] = useState<string | null>(null);
   const [displayRefresh, setDisplayRefresh] = useState<DisplayRefreshId>(() =>
     loadDisplayRefresh(),
   );
@@ -415,14 +418,14 @@ export function App() {
   const onDragStart = useCallback((event: DragEvent<HTMLElement>, cardId: string) => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', cardId);
-    setDraggingId(cardId as CardId);
+    setDraggingId(cardId as DashboardCardId);
   }, []);
 
   const onDragOver = useCallback(
     (event: DragEvent<HTMLElement>, cardId: string) => {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
-      const targetId = cardId as CardId;
+      const targetId = cardId as DashboardCardId;
       setDragOverId(targetId);
       // Browsers often block dataTransfer.getData during dragover; use React state.
       const sourceId = draggingId;
@@ -452,23 +455,112 @@ export function App() {
     setDragOverId(null);
   }, []);
 
-  const onToggleHidden = useCallback((cardId: CardId) => {
+  const onToggleHidden = useCallback((cardId: DashboardCardId) => {
     setHiddenCards((prev) => {
       const set = new Set(prev);
       if (set.has(cardId)) set.delete(cardId);
       else set.add(cardId);
-      const next = DEFAULT_CARD_ORDER.filter((id) => set.has(id));
+      const next = [...set];
       saveHiddenCards(next);
       return next;
     });
   }, []);
 
-  const onToggleWide = useCallback((cardId: CardId) => {
+  const onToggleWide = useCallback((cardId: DashboardCardId) => {
     setWideCards((prev) => {
       const set = new Set(prev);
       if (set.has(cardId)) set.delete(cardId);
       else set.add(cardId);
-      const next = DEFAULT_CARD_ORDER.filter((id) => set.has(id));
+      const next = [...set];
+      saveWideCards(next);
+      return next;
+    });
+  }, []);
+
+  const onAddUrlCard = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault();
+      const title = addTitle.trim();
+      const url = addUrl.trim();
+      if (!title) {
+        setAddError('Title is required');
+        return;
+      }
+      if (!isAllowedDashboardUrl(url)) {
+        setAddError(
+          'URL must be https://, or http:// to a LAN host (.lan, private IP, or localhost)',
+        );
+        return;
+      }
+      const heightRaw = addHeight.trim() === '' ? DEFAULT_URL_CARD_HEIGHT_REM : Number(addHeight);
+      const heightRem = clampHeightRem(
+        Number.isFinite(heightRaw) ? heightRaw : DEFAULT_URL_CARD_HEIGHT_REM,
+      );
+      const def: UrlCardDef = {
+        id: mintUrlCardId(),
+        title,
+        url,
+        ...(heightRem !== DEFAULT_URL_CARD_HEIGHT_REM ? { heightRem } : {}),
+      };
+      setUrlCards((prev) => {
+        const next = [...prev, def];
+        saveUrlCards(next);
+        return next;
+      });
+      setCardOrder((prev) => {
+        const next = [...prev, def.id];
+        saveCardOrder(next);
+        return next;
+      });
+      setAddTitle('');
+      setAddUrl('');
+      setAddHeight(String(DEFAULT_URL_CARD_HEIGHT_REM));
+      setAddError(null);
+      setAddingUrlCard(false);
+    },
+    [addHeight, addTitle, addUrl],
+  );
+
+  const onUpdateUrlCard = useCallback(
+    (id: UrlCardId, patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem'>) => {
+      if (!isAllowedDashboardUrl(patch.url)) return;
+      const heightRem = clampHeightRem(patch.heightRem ?? DEFAULT_URL_CARD_HEIGHT_REM);
+      setUrlCards((prev) => {
+        const next = prev.map((c) =>
+          c.id === id
+            ? {
+                id,
+                title: patch.title.trim(),
+                url: patch.url.trim(),
+                ...(heightRem !== DEFAULT_URL_CARD_HEIGHT_REM ? { heightRem } : {}),
+              }
+            : c,
+        );
+        saveUrlCards(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const onDeleteUrlCard = useCallback((id: UrlCardId) => {
+    setUrlCards((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveUrlCards(next);
+      return next;
+    });
+    setCardOrder((prev) => {
+      const next = prev.filter((cid) => cid !== id);
+      saveCardOrder(next);
+      return next;
+    });
+    setHiddenCards((prev) => {
+      const next = prev.filter((cid) => cid !== id);
+      saveHiddenCards(next);
+      return next;
+    });
+    setWideCards((prev) => {
+      const next = prev.filter((cid) => cid !== id);
       saveWideCards(next);
       return next;
     });
@@ -476,8 +568,13 @@ export function App() {
 
   const hiddenSet = useMemo(() => new Set(hiddenCards), [hiddenCards]);
   const wideSet = useMemo(() => new Set(wideCards), [wideCards]);
+  const urlCardById = useMemo(() => {
+    const map = new Map<UrlCardId, UrlCardDef>();
+    for (const c of urlCards) map.set(c.id, c);
+    return map;
+  }, [urlCards]);
 
-  const cardChrome = (cardId: CardId) => ({
+  const cardChrome = (cardId: DashboardCardId) => ({
     cardId,
     draggable: true as const,
     editMode,
@@ -501,7 +598,7 @@ export function App() {
       ]
     : null;
 
-  const cards: Record<CardId, ReactNode> = {
+  const builtinCards: Record<BuiltinCardId, ReactNode> = {
     trafficSummary: summaryRows ? (
       <DataTable
         key="trafficSummary"
@@ -899,8 +996,38 @@ export function App() {
       ) : null,
   };
 
+  const renderCard = (id: DashboardCardId): ReactNode => {
+    if (isUrlCardId(id)) {
+      const def = urlCardById.get(id);
+      if (!def) return null;
+      const chrome = cardChrome(id);
+      return (
+        <UrlCard
+          key={id}
+          def={def}
+          editMode={chrome.editMode}
+          hidden={chrome.hidden}
+          onToggleHidden={chrome.onToggleHidden}
+          wide={chrome.wide}
+          onToggleWide={chrome.onToggleWide}
+          isDragging={chrome.isDragging}
+          isDragOver={chrome.isDragOver}
+          onDragStart={chrome.onDragStart}
+          onDragOver={chrome.onDragOver}
+          onDragLeave={chrome.onDragLeave}
+          onDrop={chrome.onDrop}
+          onDragEnd={chrome.onDragEnd}
+          onUpdate={(patch) => onUpdateUrlCard(id, patch)}
+          onDelete={() => onDeleteUrlCard(id)}
+        />
+      );
+    }
+    return builtinCards[id];
+  };
+
   const visibleCards = cardOrder.filter((id) => {
     if (id === 'topCountries' && !geoipPresent) return false;
+    if (isUrlCardId(id) && !urlCardById.has(id)) return false;
     if (!editMode && hiddenSet.has(id)) return false;
     return true;
   });
@@ -1024,16 +1151,98 @@ export function App() {
         <p className="muted">Dashboard unavailable — start the API or check the /api proxy.</p>
       )}
 
+      {editMode && dashboard.data && (
+        <div className="url-card-add-bar">
+          {addingUrlCard ? (
+            <form
+              className="url-card-form url-card-add-form"
+              onSubmit={onAddUrlCard}
+              aria-label="Add URL card"
+            >
+              <div className="url-card-form-row">
+                <label htmlFor="add-url-card-title">Title</label>
+                <input
+                  id="add-url-card-title"
+                  type="text"
+                  value={addTitle}
+                  onChange={(e) => setAddTitle(e.target.value)}
+                  autoComplete="off"
+                  required
+                />
+              </div>
+              <div className="url-card-form-row">
+                <label htmlFor="add-url-card-url">URL</label>
+                <input
+                  id="add-url-card-url"
+                  type="url"
+                  value={addUrl}
+                  onChange={(e) => setAddUrl(e.target.value)}
+                  placeholder="https://… or http://host.lan"
+                  autoComplete="off"
+                  required
+                />
+              </div>
+              <div className="url-card-form-row">
+                <label htmlFor="add-url-card-height">
+                  Height (rem, {MIN_URL_CARD_HEIGHT_REM}–{MAX_URL_CARD_HEIGHT_REM})
+                </label>
+                <input
+                  id="add-url-card-height"
+                  type="number"
+                  min={MIN_URL_CARD_HEIGHT_REM}
+                  max={MAX_URL_CARD_HEIGHT_REM}
+                  step={1}
+                  value={addHeight}
+                  onChange={(e) => setAddHeight(e.target.value)}
+                />
+              </div>
+              {addError ? (
+                <p className="url-card-form-error" role="alert">
+                  {addError}
+                </p>
+              ) : null}
+              <div className="url-card-form-actions">
+                <button type="submit" className="primary">
+                  Add card
+                </button>
+                <button
+                  type="button"
+                  className="copy-btn"
+                  onClick={() => {
+                    setAddingUrlCard(false);
+                    setAddError(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="primary url-card-add-btn"
+              aria-label="Add URL card"
+              onClick={() => {
+                setAddingUrlCard(true);
+                setAddError(null);
+              }}
+            >
+              + Add URL card
+            </button>
+          )}
+        </div>
+      )}
+
       {dashboard.data && (
         <div className="dashboard-boards">
           {boardSegments.map((segment) =>
             segment.type === 'grid' ? (
               <div key={`grid:${segment.ids.join(',')}`} className="grid">
-                {segment.ids.map((id) => cards[id])}
+                {segment.ids.map((id) => renderCard(id))}
               </div>
             ) : (
               <div key={`wide:${segment.id}`} className="grid-wide">
-                {cards[segment.id]}
+                {renderCard(segment.id)}
               </div>
             ),
           )}
