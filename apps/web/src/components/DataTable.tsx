@@ -35,6 +35,58 @@ function columnWidthClass(col: { width?: ColumnWidth; numeric?: boolean }): stri
   return undefined;
 }
 
+const TABLE_SORT_KEY = 'wdmbg.tableSort';
+
+type TableSortMap = Record<string, { key: string; dir: SortDir }>;
+
+function loadAllTableSort(): TableSortMap {
+  try {
+    const raw = localStorage.getItem(TABLE_SORT_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: TableSortMap = {};
+    for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const rec = value as { key?: unknown; dir?: unknown };
+      if (typeof rec.key !== 'string' || (rec.dir !== 'asc' && rec.dir !== 'desc')) continue;
+      out[id] = { key: rec.key, dir: rec.dir };
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function loadTableSort(tableId: string): { key: string; dir: SortDir } | null {
+  return loadAllTableSort()[tableId] ?? null;
+}
+
+function saveTableSort(tableId: string, key: string | null, dir: SortDir) {
+  try {
+    const all = loadAllTableSort();
+    if (!key) {
+      delete all[tableId];
+    } else {
+      all[tableId] = { key, dir };
+    }
+    localStorage.setItem(TABLE_SORT_KEY, JSON.stringify(all));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function initialSortState(
+  sortId: string | undefined,
+  columns: { key: string }[],
+): { key: string | null; dir: SortDir } {
+  if (!sortId) return { key: null, dir: 'desc' };
+  const saved = loadTableSort(sortId);
+  if (!saved) return { key: null, dir: 'desc' };
+  if (!columns.some((c) => c.key === saved.key)) return { key: null, dir: 'desc' };
+  return { key: saved.key, dir: saved.dir };
+}
+
 export interface DataTableProps<T> {
   title: string;
   columns: Column<T>[];
@@ -42,14 +94,22 @@ export interface DataTableProps<T> {
   empty?: string;
   /** Subtitle under the title (window + unit legend). */
   legend?: string;
-  /** Stable id for drag/drop reorder. */
+  /** Stable id for drag/drop reorder. Also used as sort key when tableId is omitted. */
   cardId?: string;
+  /**
+   * Stable id for sort-order persistence (localStorage wdmbg.tableSort).
+   * Dashboard cards typically omit this and use cardId; HostDialog tables pass explicit ids.
+   */
+  tableId?: string;
   draggable?: boolean;
-  /** Layout edit mode: show drag handle + hide toggle; omit copy. */
+  /** Layout edit mode: show drag handle + hide/wide toggles; omit copy. */
   editMode?: boolean;
   /** Card is user-hidden (still visible in edit mode, dulled). */
   hidden?: boolean;
   onToggleHidden?: () => void;
+  /** Card spans full dashboard width (multi-column / masonry). */
+  wide?: boolean;
+  onToggleWide?: () => void;
   isDragging?: boolean;
   isDragOver?: boolean;
   onDragStart?: (event: DragEvent<HTMLElement>, cardId: string) => void;
@@ -73,10 +133,13 @@ export function DataTable<T>({
   empty = 'No data',
   legend,
   cardId,
+  tableId,
   draggable = false,
   editMode = false,
   hidden = false,
   onToggleHidden,
+  wide = false,
+  onToggleWide,
   isDragging = false,
   isDragOver = false,
   onDragStart,
@@ -85,8 +148,10 @@ export function DataTable<T>({
   onDrop,
   onDragEnd,
 }: DataTableProps<T>) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const sortId = tableId ?? cardId;
+  const initial = initialSortState(sortId, columns);
+  const [sortKey, setSortKey] = useState<string | null>(initial.key);
+  const [sortDir, setSortDir] = useState<SortDir>(initial.dir);
 
   const sortedRows = useMemo(() => {
     if (!sortKey) return rows;
@@ -114,17 +179,17 @@ export function DataTable<T>({
     isDragging ? 'is-dragging' : '',
     isDragOver ? 'is-drag-over' : '',
     editMode && hidden ? 'is-hidden-card' : '',
+    wide ? 'is-wide-card' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   const toggleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-    setSortKey(key);
-    setSortDir('desc');
+    const nextKey = key;
+    const nextDir: SortDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : 'desc';
+    setSortKey(nextKey);
+    setSortDir(nextDir);
+    if (sortId) saveTableSort(sortId, nextKey, nextDir);
   };
 
   return (
@@ -169,16 +234,28 @@ export function DataTable<T>({
           {legendText ? <p className="panel-legend">{legendText}</p> : null}
         </div>
         {editMode ? (
-          <button
-            type="button"
-            className={`hide-card-btn icon-btn${hidden ? ' is-hidden' : ''}`}
-            title={hidden ? `Show ${title}` : `Hide ${title}`}
-            aria-label={hidden ? `Show ${title}` : `Hide ${title}`}
-            aria-pressed={hidden}
-            onClick={onToggleHidden}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
+          <div className="panel-actions">
+            <button
+              type="button"
+              className={`wide-card-btn${wide ? ' is-wide' : ''}`}
+              title={wide ? `Make ${title} normal width` : `Make ${title} full width`}
+              aria-label={wide ? `Make ${title} normal width` : `Make ${title} full width`}
+              aria-pressed={wide}
+              onClick={onToggleWide}
+            >
+              Wide
+            </button>
+            <button
+              type="button"
+              className={`hide-card-btn icon-btn${hidden ? ' is-hidden' : ''}`}
+              title={hidden ? `Show ${title}` : `Hide ${title}`}
+              aria-label={hidden ? `Show ${title}` : `Hide ${title}`}
+              aria-pressed={hidden}
+              onClick={onToggleHidden}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
         ) : (
           <CopyButton richText={rich} csvText={csv} />
         )}

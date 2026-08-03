@@ -143,6 +143,7 @@ export function HostDialog({
         {totals && (
           <DataTable
             title="Totals"
+            tableId="host-totals"
             legend={legend}
             rows={totals}
             columns={[
@@ -188,6 +189,7 @@ export function HostDialog({
         {summary.data && (
           <DataTable
             title="Top protocols"
+            tableId="host-protocols"
             legend={legend}
             rows={summary.data.topProtocols}
             columns={[
@@ -217,6 +219,7 @@ export function HostDialog({
         {summary.data && (
           <DataTable
             title="Top peers"
+            tableId="host-peers"
             legend={legend}
             rows={summary.data.topPeers}
             columns={[
@@ -273,6 +276,7 @@ export function HostDialog({
         {flows.data && (
           <DataTable
             title="Flows (host-relative)"
+            tableId="host-flows"
             legend={legend}
             rows={flows.data.flows}
             columns={[

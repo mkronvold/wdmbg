@@ -172,6 +172,13 @@ body {
   page-break-inside: avoid;
 }
 
+/* Full-width cards span all columns in multi-column masonry packing. */
+.grid > .panel.is-wide-card {
+  column-span: all;
+  width: 100%;
+  display: block;
+}
+
 /* Native masonry when available (Firefox); keeps horizontal-first flow closer to grid. */
 @supports (grid-template-rows: masonry) {
   .grid {
@@ -191,6 +198,10 @@ body {
     break-inside: auto;
     -webkit-column-break-inside: auto;
     page-break-inside: auto;
+  }
+
+  .grid > .panel.is-wide-card {
+    grid-column: 1 / -1;
   }
 }
 
@@ -565,10 +576,16 @@ a.sha-link:hover {
   text-underline-offset: 2px;
 }
 
-.hide-card-btn {
+.panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
+}
+
+.hide-card-btn,
+.wide-card-btn {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -577,17 +594,35 @@ a.sha-link:hover {
   background: color-mix(in srgb, var(--theme-surface) 88%, transparent);
   color: var(--theme-muted-text);
   cursor: pointer;
-  font-size: 1.15rem;
   line-height: 1;
   padding: 0;
 }
 
-.hide-card-btn:hover {
+.hide-card-btn {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.15rem;
+}
+
+.wide-card-btn {
+  height: 2rem;
+  min-width: 2.75rem;
+  padding: 0 0.5rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hide-card-btn:hover,
+.wide-card-btn:hover {
   color: var(--theme-text);
   border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-border));
 }
 
-.hide-card-btn.is-hidden {
+.hide-card-btn.is-hidden,
+.wide-card-btn.is-wide {
   color: var(--theme-text);
   background: color-mix(in srgb, var(--theme-accent) 22%, var(--theme-surface));
   border-color: color-mix(in srgb, var(--theme-accent) 55%, var(--theme-border));
