@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { TrafficStore, hostRelative } from './store.js';
-import { buildDashboard, hostFlows, hostSummary, topReceivers, topTalkers } from './aggregate.js';
+import {
+  buildDashboard,
+  buildTrafficSummary,
+  hostFlows,
+  hostSummary,
+  topReceivers,
+  topTalkers,
+} from './aggregate.js';
 
 function seed(store: TrafficStore, nowSec: number) {
   store.ingest({
@@ -118,6 +125,23 @@ describe('aggregation', () => {
     expect(filtered.hotFlows.some((f) => f.src === '10.0.0.20' && f.dst === '10.0.0.10')).toBe(
       false,
     );
+  });
+
+  it('splits local vs internet byte buckets (independent of excludeLocal)', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    seed(store, now);
+    // seed: local pair 10.0.0.20→10.0.0.10 (200+50) and internet 10.0.0.10→1.1.1.1 (1000+9000)
+    const summary = buildTrafficSummary(store.aggregateFlows('5s', now));
+    expect(summary.local).toEqual({ txBytes: 200, rxBytes: 50, totalBytes: 250 });
+    // LAN-centric: TX = LAN→remote 1000, RX = remote→LAN 9000
+    expect(summary.internet).toEqual({ txBytes: 1000, rxBytes: 9000, totalBytes: 10_000 });
+
+    const withLocal = buildDashboard(store, '5s', now);
+    const withoutLocal = buildDashboard(store, '5s', now, undefined, { excludeLocal: true });
+    expect(withLocal.summary).toEqual(summary);
+    expect(withoutLocal.summary).toEqual(summary);
+    expect(withoutLocal.hotFlows).toHaveLength(1);
   });
 
   it('returns host-relative flows', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dashboardSchema,
   flowRowSchema,
   healthSchema,
   isLocalAddress,
@@ -8,6 +9,7 @@ import {
   resolveSourceSchema,
   RING_BUCKET_COUNT,
   rollupEnvelopeSchema,
+  trafficSummarySchema,
   windowSchema,
   WINDOW_SECONDS,
 } from './index.js';
@@ -115,6 +117,34 @@ describe('flowRowSchema', () => {
     });
     expect(parsed.srcLabel).toBe('nas');
     expect(parsed.dstLabel).toBe('cloudflare');
+  });
+});
+
+describe('trafficSummarySchema', () => {
+  it('accepts local and internet byte buckets', () => {
+    const summary = trafficSummarySchema.parse({
+      local: { txBytes: 100, rxBytes: 200, totalBytes: 300 },
+      internet: { txBytes: 1000, rxBytes: 5000, totalBytes: 6000 },
+    });
+    expect(summary.local.totalBytes).toBe(300);
+    expect(summary.internet.txBytes).toBe(1000);
+  });
+
+  it('is required on dashboard payloads', () => {
+    const parsed = dashboardSchema.parse({
+      window: '30s',
+      generatedAt: '2026-07-30T12:00:00.000Z',
+      topTalkers: [],
+      topReceivers: [],
+      topProtocols: [],
+      hotFlows: [],
+      topCountries: [],
+      summary: {
+        local: { txBytes: 0, rxBytes: 0, totalBytes: 0 },
+        internet: { txBytes: 0, rxBytes: 0, totalBytes: 0 },
+      },
+    });
+    expect(parsed.summary.local.txBytes).toBe(0);
   });
 });
 

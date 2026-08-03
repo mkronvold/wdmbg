@@ -249,6 +249,10 @@ describe('API', () => {
     });
     const all = await app.inject({ method: 'GET', url: '/api/dashboard?window=5s' });
     expect(all.json().hotFlows.length).toBe(2);
+    expect(all.json().summary).toEqual({
+      local: { txBytes: 1000, rxBytes: 1000, totalBytes: 2000 },
+      internet: { txBytes: 50, rxBytes: 50, totalBytes: 100 },
+    });
     const filtered = await app.inject({
       method: 'GET',
       url: '/api/dashboard?window=5s&excludeLocal=1',
@@ -256,5 +260,7 @@ describe('API', () => {
     expect(filtered.statusCode).toBe(200);
     expect(filtered.json().hotFlows).toHaveLength(1);
     expect(filtered.json().hotFlows[0]?.dst).toBe('1.1.1.1');
+    // Summary always includes both buckets even when local flows are filtered out.
+    expect(filtered.json().summary).toEqual(all.json().summary);
   });
 });

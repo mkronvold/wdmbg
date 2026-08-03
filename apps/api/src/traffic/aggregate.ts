@@ -6,6 +6,8 @@ import {
   type ProtocolRow,
   type QueryWindow,
   type TalkerRow,
+  type TrafficBucket,
+  type TrafficSummary,
   WINDOW_SECONDS,
 } from '@wdmbg/contracts';
 import { hostRelative, type StoredFlow, type TrafficStore } from './store.js';
@@ -36,6 +38,42 @@ function sortByBytesDesc<T>(rows: T[], pick: (row: T) => number, limit: number):
 export function filterFlows(flows: StoredFlow[], opts?: AggregateOptions): StoredFlow[] {
   if (!opts?.excludeLocal) return flows;
   return flows.filter((f) => !isLocalPair(f.src, f.dst));
+}
+
+function emptyBucket(): TrafficBucket {
+  return { txBytes: 0, rxBytes: 0, totalBytes: 0 };
+}
+
+/**
+ * Attribute flow bytes to TX/RX.
+ * When one end is LAN and the other is not, use LAN-centric direction
+ * (TX = LAN→remote, RX = remote→LAN). Otherwise use flow orientation
+ * (TX = src→dst, RX = dst→src), matching hot-flow semantics.
+ */
+function directionalBytes(flow: StoredFlow): { txBytes: number; rxBytes: number } {
+  const srcLocal = isLocalAddress(flow.src);
+  const dstLocal = isLocalAddress(flow.dst);
+  if (srcLocal && !dstLocal) {
+    return { txBytes: flow.bytesSrcToDst, rxBytes: flow.bytesDstToSrc };
+  }
+  if (!srcLocal && dstLocal) {
+    return { txBytes: flow.bytesDstToSrc, rxBytes: flow.bytesSrcToDst };
+  }
+  return { txBytes: flow.bytesSrcToDst, rxBytes: flow.bytesDstToSrc };
+}
+
+/** Split window flows into always-on Local vs Internet buckets. */
+export function buildTrafficSummary(flows: StoredFlow[]): TrafficSummary {
+  const local = emptyBucket();
+  const internet = emptyBucket();
+  for (const flow of flows) {
+    const { txBytes, rxBytes } = directionalBytes(flow);
+    const bucket = isLocalPair(flow.src, flow.dst) ? local : internet;
+    bucket.txBytes += txBytes;
+    bucket.rxBytes += rxBytes;
+    bucket.totalBytes += txBytes + rxBytes;
+  }
+  return { local, internet };
 }
 
 export function buildHostStats(
@@ -267,7 +305,8 @@ export function buildDashboard(
   labels: LabelLookup = defaultCountryLookup,
   opts?: AggregateOptions,
 ) {
-  const flows = filterFlows(store.aggregateFlows(window, nowSec), opts);
+  const allFlows = store.aggregateFlows(window, nowSec);
+  const flows = filterFlows(allFlows, opts);
   return {
     window,
     generatedAt: new Date(nowSec * 1000).toISOString(),
@@ -276,5 +315,7 @@ export function buildDashboard(
     topProtocols: topProtocols(flows),
     hotFlows: hotFlows(flows, 15, labels),
     topCountries: topCountries(flows, 10, labels),
+    // Always both buckets for the window — independent of excludeLocal.
+    summary: buildTrafficSummary(allFlows),
   };
 }

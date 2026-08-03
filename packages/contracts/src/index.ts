@@ -113,6 +113,24 @@ export const countryRowSchema = z.object({
 });
 export type CountryRow = z.infer<typeof countryRowSchema>;
 
+/** Byte totals for one traffic bucket (local or internet). */
+export const trafficBucketSchema = z.object({
+  txBytes: z.number().nonnegative(),
+  rxBytes: z.number().nonnegative(),
+  totalBytes: z.number().nonnegative(),
+});
+export type TrafficBucket = z.infer<typeof trafficBucketSchema>;
+
+/**
+ * Always-on Local vs Internet split for the selected window.
+ * Independent of the dashboard excludeLocal filter.
+ */
+export const trafficSummarySchema = z.object({
+  local: trafficBucketSchema,
+  internet: trafficBucketSchema,
+});
+export type TrafficSummary = z.infer<typeof trafficSummarySchema>;
+
 export const dashboardSchema = z.object({
   window: windowSchema,
   generatedAt: z.string().datetime(),
@@ -121,6 +139,7 @@ export const dashboardSchema = z.object({
   topProtocols: z.array(protocolRowSchema),
   hotFlows: z.array(flowRowSchema),
   topCountries: z.array(countryRowSchema),
+  summary: trafficSummarySchema,
 });
 export type Dashboard = z.infer<typeof dashboardSchema>;
 

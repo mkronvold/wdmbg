@@ -20,7 +20,11 @@ export interface HostDialogProps {
   onClose: () => void;
 }
 
-type MetricRow = { metric: string; value: string };
+type TotalsRow = {
+  txBytes: number;
+  rxBytes: number;
+  totalBytes: number;
+};
 
 export function HostDialog({
   host,
@@ -102,13 +106,13 @@ export function HostDialog({
     },
   });
 
-  const totals: MetricRow[] | null = summary.data
+  const totals: TotalsRow[] | null = summary.data
     ? [
-        { metric: 'TX MB', value: formatMb(summary.data.txBytes) },
-        { metric: 'RX MB', value: formatMb(summary.data.rxBytes) },
-        { metric: 'Total MB', value: formatMb(summary.data.totalBytes) },
-        { metric: 'TX Mbps', value: formatMbps(summary.data.txBytes, secs) },
-        { metric: 'RX Mbps', value: formatMbps(summary.data.rxBytes, secs) },
+        {
+          txBytes: summary.data.txBytes,
+          rxBytes: summary.data.rxBytes,
+          totalBytes: summary.data.totalBytes,
+        },
       ]
     : null;
 
@@ -139,13 +143,40 @@ export function HostDialog({
             legend={legend}
             rows={totals}
             columns={[
-              { key: 'm', header: 'Metric', render: (r: MetricRow) => r.metric },
               {
-                key: 'v',
-                header: 'Value',
+                key: 'tx',
+                header: 'TX MB',
                 numeric: true,
-                render: (r: MetricRow) => r.value,
-                sortValue: (r: MetricRow) => Number(r.value) || r.value,
+                render: (r: TotalsRow) => formatMb(r.txBytes),
+                sortValue: (r: TotalsRow) => r.txBytes,
+              },
+              {
+                key: 'rx',
+                header: 'RX MB',
+                numeric: true,
+                render: (r: TotalsRow) => formatMb(r.rxBytes),
+                sortValue: (r: TotalsRow) => r.rxBytes,
+              },
+              {
+                key: 'tot',
+                header: 'Total MB',
+                numeric: true,
+                render: (r: TotalsRow) => formatMb(r.totalBytes),
+                sortValue: (r: TotalsRow) => r.totalBytes,
+              },
+              {
+                key: 'txr',
+                header: 'TX Mbps',
+                numeric: true,
+                render: (r: TotalsRow) => formatMbps(r.txBytes, secs),
+                sortValue: (r: TotalsRow) => r.txBytes,
+              },
+              {
+                key: 'rxr',
+                header: 'RX Mbps',
+                numeric: true,
+                render: (r: TotalsRow) => formatMbps(r.rxBytes, secs),
+                sortValue: (r: TotalsRow) => r.rxBytes,
               },
             ]}
           />
