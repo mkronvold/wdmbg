@@ -4,8 +4,8 @@ import { rowsToCsv, rowsToRich } from './tableCopy';
 
 export type SortDir = 'asc' | 'desc';
 
-/** Column width packing: primary takes remaining space; min shrinks to content. */
-export type ColumnWidth = 'primary' | 'min' | 'auto';
+/** Column width packing: primary takes remaining space; share splits it; min shrinks. */
+export type ColumnWidth = 'primary' | 'share' | 'min' | 'auto';
 
 export interface Column<T> {
   key: string;
@@ -18,7 +18,8 @@ export interface Column<T> {
   numeric?: boolean;
   /**
    * Width packing hint.
-   * - primary: absorbs remaining table width
+   * - primary: sole absorber of remaining table width
+   * - share: equal share of leftover width (e.g. Src + Dst)
    * - min: shrink to header/content (nowrap)
    * - auto: browser default
    * Defaults to min when numeric, otherwise auto.
@@ -28,9 +29,14 @@ export interface Column<T> {
   sortValue?: (row: T) => string | number;
 }
 
+function resolvedWidth(col: { width?: ColumnWidth; numeric?: boolean }): ColumnWidth {
+  return col.width ?? (col.numeric ? 'min' : 'auto');
+}
+
 function columnWidthClass(col: { width?: ColumnWidth; numeric?: boolean }): string | undefined {
-  const width = col.width ?? (col.numeric ? 'min' : 'auto');
+  const width = resolvedWidth(col);
   if (width === 'primary') return 'col-primary';
+  if (width === 'share') return 'col-share';
   if (width === 'min') return 'col-min';
   return undefined;
 }
@@ -108,6 +114,9 @@ export function DataTable<T>({
 
   const canDrag = Boolean(editMode && draggable && cardId);
 
+  const hasShareCols = columns.some((c) => resolvedWidth(c) === 'share');
+  const primaryCount = columns.filter((c) => resolvedWidth(c) === 'primary').length;
+
   const panelClass = [
     'panel',
     'table-panel',
@@ -117,6 +126,11 @@ export function DataTable<T>({
   ]
     .filter(Boolean)
     .join(' ');
+
+  const tableClass =
+    [hasShareCols ? 'has-share-cols' : '', primaryCount === 1 ? 'has-one-primary' : '']
+      .filter(Boolean)
+      .join(' ') || undefined;
 
   const toggleSort = (key: string) => {
     if (sortKey === key) {
@@ -187,7 +201,7 @@ export function DataTable<T>({
         <p className="muted">{empty}</p>
       ) : (
         <div className="table-wrap">
-          <table>
+          <table className={tableClass}>
             <thead>
               <tr>
                 {columns.map((c) => {

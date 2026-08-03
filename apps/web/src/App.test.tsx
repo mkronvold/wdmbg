@@ -273,13 +273,18 @@ describe('App', () => {
     );
 
     const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
-    expect(within(flows).getByRole('columnheader', { name: 'Dst' })).toHaveClass('col-primary');
-    expect(within(flows).getByRole('columnheader', { name: 'Src' })).toHaveClass('col-min');
+    expect(flows.querySelector('table')).toHaveClass('has-share-cols');
+    expect(within(flows).getByRole('columnheader', { name: 'Dst' })).toHaveClass('col-share');
+    expect(within(flows).getByRole('columnheader', { name: 'Src' })).toHaveClass('col-share');
     expect(within(flows).getByRole('columnheader', { name: 'SPort' })).toHaveClass(
       'col-min',
       'num',
     );
     expect(within(flows).getByRole('columnheader', { name: 'L4' })).toHaveClass('col-min');
+
+    // Single-primary tables still mark the text column as sole absorber
+    expect(talkers.querySelector('table')).toHaveClass('has-one-primary');
+    expect(talkers.querySelector('table')).not.toHaveClass('has-share-cols');
   });
 
   it('shows HostDialog totals with metric names as column headers', async () => {
@@ -304,6 +309,30 @@ describe('App', () => {
     expect(totals.getByRole('columnheader', { name: 'RX Mbps' })).toBeInTheDocument();
     expect(totals.queryByRole('columnheader', { name: 'Metric' })).not.toBeInTheDocument();
     expect(totals.queryByRole('columnheader', { name: 'Value' })).not.toBeInTheDocument();
+  });
+
+  it('shares leftover width between Src and Dst on host detail flows', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    const dlg = within(dialog);
+    await waitFor(() => {
+      expect(dlg.getByRole('heading', { name: 'Flows (host-relative)' })).toBeInTheDocument();
+    });
+    const hostFlows = dlg
+      .getByRole('heading', { name: 'Flows (host-relative)' })
+      .closest('section')!;
+    expect(hostFlows.querySelector('table')).toHaveClass('has-share-cols');
+    expect(within(hostFlows).getByRole('columnheader', { name: 'Src' })).toHaveClass('col-share');
+    expect(within(hostFlows).getByRole('columnheader', { name: 'Dst' })).toHaveClass('col-share');
+    expect(within(hostFlows).getByRole('columnheader', { name: 'SPort' })).toHaveClass(
+      'col-min',
+      'num',
+    );
   });
 
   it('opens host details from hot flow Src/Dst IPs and deep-links', async () => {

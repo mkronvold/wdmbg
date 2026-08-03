@@ -332,16 +332,25 @@ td {
   vertical-align: top;
 }
 
-/* Shrink meta/numeric cols to content; primary absorbs leftover width */
+/* Shrink meta/numeric cols to content; primary/share absorb leftover width */
 th.col-min,
 td.col-min {
   width: 1%;
   white-space: nowrap;
 }
 
+/* Sole primary absorber (talkers, peers, protocols, etc.) */
+table.has-one-primary th.col-primary,
+table.has-one-primary td.col-primary,
 th.col-primary,
 td.col-primary {
   width: 100%;
+}
+
+/* Equal share of leftover (e.g. Src + Dst on flow tables) */
+table.has-share-cols th.col-share,
+table.has-share-cols td.col-share {
+  width: 50%;
 }
 
 th.num,
@@ -357,12 +366,13 @@ td.cell-host {
   word-break: break-word;
 }
 
-/* Non-primary host cols stay compact so primary (e.g. Dst) wins leftover space */
+/* Non-primary host cols stay compact so primary (e.g. Host) wins leftover space */
 td.col-min.cell-host {
   max-width: 11rem;
 }
 
-td.col-primary.cell-host {
+td.col-primary.cell-host,
+td.col-share.cell-host {
   max-width: none;
 }
 
