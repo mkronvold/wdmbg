@@ -179,6 +179,7 @@ describe('App', () => {
     expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
     expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
+    expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
     expect(view.getByText('sha-dev')).toBeInTheDocument();
   });
 
@@ -326,6 +327,49 @@ describe('App', () => {
     const view = within(container);
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top traffic by country' })).toBeInTheDocument();
+    });
+  });
+
+  it('hides Country columns when geoip is not present', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
+    expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
+
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    await waitFor(() => {
+      expect(within(dialog).getByRole('heading', { name: 'Top peers' })).toBeInTheDocument();
+    });
+    expect(within(dialog).queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
+  });
+
+  it('shows Country columns when geoip is present', async () => {
+    vi.mocked(client.fetchHealth).mockResolvedValue({
+      status: 'ok',
+      service: 'wdmbg-api',
+      version: '0.0.0',
+      geoip: { configured: true, present: true },
+    });
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(view.getAllByRole('columnheader', { name: 'Country' }).length).toBeGreaterThanOrEqual(
+        2,
+      );
+    });
+    expect(view.getByRole('heading', { name: 'Top traffic by country' })).toBeInTheDocument();
+
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    await waitFor(() => {
+      expect(within(dialog).getByRole('columnheader', { name: 'Country' })).toBeInTheDocument();
     });
   });
 });
