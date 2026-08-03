@@ -10,6 +10,8 @@ export interface HostDialogProps {
   host: string;
   window: QueryWindow;
   excludeLocal?: boolean;
+  /** When false, omit Country column (GeoIP DB not present). */
+  showCountry?: boolean;
   /** Open/switch detailed view to another host (updates parent + ?ip=). */
   onSelectHost?: (host: string) => void;
   onClose: () => void;
@@ -21,6 +23,7 @@ export function HostDialog({
   host,
   window,
   excludeLocal = false,
+  showCountry = false,
   onSelectHost,
   onClose,
 }: HostDialogProps) {
@@ -189,11 +192,15 @@ export function HostDialog({
                 render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
                 sortValue: (r: TalkerRow) => r.rxBytes,
               },
-              {
-                key: 'c',
-                header: 'Country',
-                render: (r: TalkerRow) => r.country ?? '—',
-              },
+              ...(showCountry
+                ? [
+                    {
+                      key: 'c',
+                      header: 'Country',
+                      render: (r: TalkerRow) => r.country ?? '—',
+                    },
+                  ]
+                : []),
             ]}
           />
         )}

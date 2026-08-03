@@ -74,7 +74,7 @@ test.describe('WDMBG live smoke', () => {
     await expect(page.getByRole('heading', { name: 'Top protocols', level: 2 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Hot flows', level: 2 })).toBeVisible();
 
-    // Country card only when MMDB present — either way, no crash.
+    // Country card/columns only when MMDB present — either way, no crash.
     // Card legends use "last …" lookback wording (MB/Mbps units).
     await expect(page.getByText(/last 5s/).first()).toBeVisible();
     await expect(page.getByText(/MB/).first()).toBeVisible();

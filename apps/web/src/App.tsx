@@ -380,7 +380,9 @@ export function App() {
             render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
             sortValue: (r: TalkerRow) => r.rxBytes,
           },
-          { key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' },
+          ...(geoipPresent
+            ? [{ key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' }]
+            : []),
         ]}
       />
     ) : null,
@@ -431,7 +433,9 @@ export function App() {
             render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
             sortValue: (r: TalkerRow) => r.txBytes,
           },
-          { key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' },
+          ...(geoipPresent
+            ? [{ key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' }]
+            : []),
         ]}
       />
     ) : null,
@@ -668,6 +672,7 @@ export function App() {
           host={selectedHost}
           window={window}
           excludeLocal={excludeLocal}
+          showCountry={geoipPresent}
           onSelectHost={selectHost}
           onClose={closeHost}
         />
