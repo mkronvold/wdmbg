@@ -4,6 +4,9 @@ import { rowsToCsv, rowsToRich } from './tableCopy';
 
 export type SortDir = 'asc' | 'desc';
 
+/** Column width packing: primary takes remaining space; min shrinks to content. */
+export type ColumnWidth = 'primary' | 'min' | 'auto';
+
 export interface Column<T> {
   key: string;
   header: string;
@@ -13,8 +16,23 @@ export interface Column<T> {
   cellClassName?: string;
   /** Numeric columns get tabular alignment. */
   numeric?: boolean;
+  /**
+   * Width packing hint.
+   * - primary: absorbs remaining table width
+   * - min: shrink to header/content (nowrap)
+   * - auto: browser default
+   * Defaults to min when numeric, otherwise auto.
+   */
+  width?: ColumnWidth;
   /** Optional value used for sorting (defaults to render()). */
   sortValue?: (row: T) => string | number;
+}
+
+function columnWidthClass(col: { width?: ColumnWidth; numeric?: boolean }): string | undefined {
+  const width = col.width ?? (col.numeric ? 'min' : 'auto');
+  if (width === 'primary') return 'col-primary';
+  if (width === 'min') return 'col-min';
+  return undefined;
 }
 
 export interface DataTableProps<T> {
@@ -155,8 +173,11 @@ export function DataTable<T>({
                       ? 'ascending'
                       : 'descending'
                     : 'none';
+                  const thClass =
+                    [c.numeric ? 'num' : '', columnWidthClass(c)].filter(Boolean).join(' ') ||
+                    undefined;
                   return (
-                    <th key={c.key} className={c.numeric ? 'num' : undefined} aria-sort={ariaSort}>
+                    <th key={c.key} className={thClass} aria-sort={ariaSort}>
                       <button
                         type="button"
                         className={`th-sort${active ? ' is-active' : ''}`}
@@ -177,8 +198,9 @@ export function DataTable<T>({
                   {columns.map((c) => {
                     const value = c.render(row);
                     const className =
-                      [c.cellClassName, c.numeric ? 'num' : ''].filter(Boolean).join(' ') ||
-                      undefined;
+                      [c.cellClassName, c.numeric ? 'num' : '', columnWidthClass(c)]
+                        .filter(Boolean)
+                        .join(' ') || undefined;
                     if (c.onCellClick) {
                       return (
                         <td key={c.key} className={className}>
