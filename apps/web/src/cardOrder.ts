@@ -19,9 +19,7 @@ export function reorderCards<T extends string>(order: readonly T[], sourceId: T,
 }
 
 /** Multicol segment: consecutive non-wide cards share one `.grid`. */
-export type CardSegment<T extends string> =
-  | { type: 'grid'; ids: T[] }
-  | { type: 'wide'; id: T };
+export type CardSegment<T extends string> = { type: 'grid'; ids: T[] } | { type: 'wide'; id: T };
 
 /**
  * Split visible card ids into multicol runs and full-width wide singles.
