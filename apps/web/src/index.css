@@ -148,13 +148,50 @@ body {
   margin: 0;
 }
 
-/* Equal-width columns grow together; min width fits rate columns on desktop */
+/*
+ * Masonry-style packing for dashboard cards.
+ * Multi-column lets short panels stack in a column beside a tall neighbor
+ * (CSS Grid rows leave empty cells under short siblings).
+ * Fill order is top-to-bottom per column, then left-to-right.
+ * column-width ~ previous auto-fit minmax(30rem); collapses to 1 col on narrow viewports.
+ */
 .grid {
   margin-top: 1.25rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
-  gap: 1rem;
-  align-items: start;
+  column-width: 30rem;
+  column-gap: 1rem;
+}
+
+.grid > .panel {
+  /* inline-block + break-inside keeps whole card in one column */
+  display: inline-block;
+  vertical-align: top;
+  width: 100%;
+  margin-bottom: 1rem;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Native masonry when available (Firefox); keeps horizontal-first flow closer to grid. */
+@supports (grid-template-rows: masonry) {
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+    grid-template-rows: masonry;
+    gap: 1rem;
+    align-items: start;
+    column-width: auto;
+    column-gap: normal;
+  }
+
+  .grid > .panel {
+    display: block;
+    width: auto;
+    margin-bottom: 0;
+    break-inside: auto;
+    -webkit-column-break-inside: auto;
+    page-break-inside: auto;
+  }
 }
 
 .panel {
