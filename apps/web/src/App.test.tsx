@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import * as client from './api/client';
+import { RESOLVE_NAME_KEY, resetAutoResolveStateForTests } from './autoResolve';
 import { THEME_STORAGE_KEY } from './theme';
 
 vi.stubGlobal(
@@ -104,7 +105,13 @@ vi.mock('./api/client', () => ({
   })),
   putAlias: vi.fn(),
   clearAlias: vi.fn(),
-  resolveHosts: vi.fn(),
+  resolveHosts: vi.fn(async (hosts: string[]) => ({
+    results: hosts.map((host) => ({
+      host,
+      hostname: `name-${host}`,
+      source: 'dns' as const,
+    })),
+  })),
 }));
 
 function renderApp() {
@@ -121,6 +128,7 @@ function renderApp() {
 describe('App', () => {
   beforeEach(() => {
     cleanup();
+    resetAutoResolveStateForTests();
     const store = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (k: string) => store.get(k) ?? null,
@@ -148,6 +156,7 @@ describe('App', () => {
     window.history.replaceState({}, '', '/');
     document.documentElement.removeAttribute('data-theme');
     vi.mocked(client.fetchDashboard).mockClear();
+    vi.mocked(client.resolveHosts).mockClear();
     vi.mocked(client.fetchHealth).mockImplementation(async () => ({
       status: 'ok',
       service: 'wdmbg-api',
@@ -314,6 +323,56 @@ describe('App', () => {
     await waitFor(() => {
       expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[1] === true)).toBe(true);
     });
+  });
+
+  it('defaults Resolve Name to Disabled and does not auto-resolve', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    expect(view.getByRole('button', { name: 'Resolve Name Disabled' })).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(vi.mocked(client.resolveHosts)).not.toHaveBeenCalled();
+  });
+
+  it('auto-resolves unnamed dashboard IPs when Resolve Name is Auto and persists', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(view.getByRole('button', { name: 'Resolve Name Disabled' }));
+    expect(view.getByRole('button', { name: 'Resolve Name Auto' })).toBeInTheDocument();
+    expect(localStorage.getItem(RESOLVE_NAME_KEY)).toBe('auto');
+
+    await waitFor(
+      () => {
+        expect(vi.mocked(client.resolveHosts)).toHaveBeenCalled();
+      },
+      { timeout: 2000 },
+    );
+
+    const resolved = vi.mocked(client.resolveHosts).mock.calls.flatMap((c) => c[0] as string[]);
+    expect(resolved).toContain('1.1.1.1');
+    expect(resolved).not.toContain('10.0.0.10');
+  });
+
+  it('restores Resolve Name Auto preference on load', async () => {
+    localStorage.setItem(RESOLVE_NAME_KEY, 'auto');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('button', { name: 'Resolve Name Auto' })).toBeInTheDocument();
+    });
+    await waitFor(
+      () => {
+        expect(vi.mocked(client.resolveHosts)).toHaveBeenCalled();
+      },
+      { timeout: 2000 },
+    );
   });
 
   it('shows Top traffic by country only when geoip present', async () => {
