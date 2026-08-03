@@ -98,7 +98,13 @@ vi.mock('./api/client', () => ({
     totalBytes: host === '10.0.0.10' ? 3_000_000 : 0,
     txRateBps: 0,
     rxRateBps: 0,
-    topProtocols: [],
+    topProtocols:
+      host === '10.0.0.10'
+        ? [
+            { protocol: 'https', bytes: 2_000_000, packets: 50 },
+            { protocol: 'dns', bytes: 120, packets: 2 },
+          ]
+        : [],
     topPeers:
       host === '10.0.0.10'
         ? [
@@ -218,7 +224,7 @@ describe('App', () => {
     expect(view.getAllByText(/last 30s/).length).toBeGreaterThan(0);
     expect(view.getAllByRole('columnheader', { name: /TX Mbps/ }).length).toBeGreaterThan(0);
     expect(view.getAllByRole('columnheader', { name: /TX MB/ }).length).toBeGreaterThan(0);
-    expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Bulk flows' })).toBeInTheDocument();
     expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     expect(view.getByText('Local')).toBeInTheDocument();
     expect(view.getByText('Internet')).toBeInTheDocument();
@@ -280,6 +286,70 @@ describe('App', () => {
     }
   });
 
+  it('applies default sorts when no saved table sort exists', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    const expectSort = (title: string, header: RegExp | string, dir: 'ascending' | 'descending') => {
+      const section = view.getByRole('heading', { name: title }).closest('section')!;
+      expect(within(section).getByRole('columnheader', { name: header })).toHaveAttribute(
+        'aria-sort',
+        dir,
+      );
+    };
+
+    expectSort('Top talkers', /TX Mbps/, 'descending');
+    expectSort('Top receivers', /RX Mbps/, 'descending');
+    expectSort('Top Local Talkers', /TX Mbps/, 'descending');
+    expectSort('Top Local Receivers', /RX Mbps/, 'descending');
+    expectSort('Top protocols', /^MB/, 'descending');
+    expectSort('Bulk flows', /^MB/, 'descending');
+    expectSort('Traffic summary', /Bucket/, 'ascending');
+
+    // Defaults must not write localStorage until the user clicks a header.
+    expect(localStorage.getItem('wdmbg.tableSort')).toBeNull();
+  });
+
+  it('applies HostDialog default sorts when no saved sort exists', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    const dlg = within(dialog);
+    await waitFor(() => {
+      expect(dlg.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+    });
+
+    const protocols = dlg.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
+    expect(within(protocols).getByRole('columnheader', { name: /^MB/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+
+    const peers = dlg.getByRole('heading', { name: 'Top peers' }).closest('section')!;
+    expect(
+      within(peers).getByRole('columnheader', {
+        name: (n) => n.replace(/[↑↓]/g, '').trim() === 'RX MB',
+      }),
+    ).toHaveAttribute('aria-sort', 'descending');
+
+    await waitFor(() => {
+      expect(dlg.getByRole('heading', { name: 'Flows (host-relative)' })).toBeInTheDocument();
+    });
+    const flows = dlg.getByRole('heading', { name: 'Flows (host-relative)' }).closest('section')!;
+    expect(within(flows).getByRole('columnheader', { name: /RX Mbps/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+    expect(localStorage.getItem('wdmbg.tableSort')).toBeNull();
+  });
+
   it('packs metric columns and marks primary text columns', async () => {
     const { container } = renderApp();
     const view = within(container);
@@ -295,7 +365,7 @@ describe('App', () => {
     );
 
     const summary = view.getByRole('heading', { name: 'Traffic summary' }).closest('section')!;
-    expect(within(summary).getByRole('columnheader', { name: 'Bucket' })).toHaveClass(
+    expect(within(summary).getByRole('columnheader', { name: /Bucket/ })).toHaveClass(
       'col-primary',
     );
     expect(within(summary).getByRole('columnheader', { name: 'TX Rate' })).toHaveClass(
@@ -307,12 +377,12 @@ describe('App', () => {
     expect(within(protocols).getByRole('columnheader', { name: 'Protocol' })).toHaveClass(
       'col-primary',
     );
-    expect(within(protocols).getByRole('columnheader', { name: 'MB' })).toHaveClass(
+    expect(within(protocols).getByRole('columnheader', { name: /^MB/ })).toHaveClass(
       'col-min',
       'num',
     );
 
-    const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
+    const flows = view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
     expect(flows.querySelector('table')).toHaveClass('has-share-cols');
     expect(within(flows).getByRole('columnheader', { name: 'Dst' })).toHaveClass('col-share');
     expect(within(flows).getByRole('columnheader', { name: 'Src' })).toHaveClass('col-share');
@@ -379,7 +449,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Bulk flows' })).toBeInTheDocument();
     });
 
     fireEvent.click(view.getByRole('button', { name: '1.1.1.1' }));
@@ -663,23 +733,23 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Bulk flows' })).toBeInTheDocument();
     });
 
-    const flowsPanel = () => view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
+    const flowsPanel = () => view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
     expect(flowsPanel()).not.toHaveClass('is-wide-card');
     expect(
-      view.queryByRole('button', { name: /Make Hot flows full width/i }),
+      view.queryByRole('button', { name: /Make Bulk flows full width/i }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
-    const wideBtn = view.getByRole('button', { name: 'Make Hot flows full width' });
+    const wideBtn = view.getByRole('button', { name: 'Make Bulk flows full width' });
     expect(wideBtn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(wideBtn);
 
     // Panel remounts under `.grid-wide` when width toggles — re-query the section.
     expect(flowsPanel()).toHaveClass('is-wide-card');
-    expect(view.getByRole('button', { name: 'Make Hot flows normal width' })).toHaveAttribute(
+    expect(view.getByRole('button', { name: 'Make Bulk flows normal width' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -689,7 +759,7 @@ describe('App', () => {
 
     fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
     expect(flowsPanel()).toHaveClass('is-wide-card');
-    expect(view.queryByRole('button', { name: /Make Hot flows/i })).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: /Make Bulk flows/i })).not.toBeInTheDocument();
   });
 
   it('restores wide cards from localStorage on load', async () => {
@@ -709,14 +779,14 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Bulk flows' })).toBeInTheDocument();
     });
 
     const boards = container.querySelector('.dashboard-boards');
     expect(boards).toBeTruthy();
     expect(boards?.parentElement).toBeTruthy();
 
-    const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
+    const flows = view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
     expect(flows).toHaveClass('is-wide-card');
     expect(flows.closest('.grid-wide')).toBeTruthy();
     expect(flows.closest('.grid')).toBeNull();
