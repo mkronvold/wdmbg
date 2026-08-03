@@ -198,8 +198,6 @@ describe('adguardConfigFromEnv', () => {
 
   it('defaults AdGuard lookup_cache TTL to 12 hours', () => {
     expect(adguardConfigFromEnv({}).cacheTtlMs).toBe(12 * 60 * 60 * 1000);
-    expect(
-      adguardConfigFromEnv({ WDMBG_ADGUARD_CACHE_TTL_MS: '600000' }).cacheTtlMs,
-    ).toBe(600_000);
+    expect(adguardConfigFromEnv({ WDMBG_ADGUARD_CACHE_TTL_MS: '600000' }).cacheTtlMs).toBe(600_000);
   });
 });
