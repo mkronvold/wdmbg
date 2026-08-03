@@ -36,6 +36,7 @@ const CARD_ORDER_KEY = 'wdmbg.dashboard.cardOrder';
 const HIDDEN_CARDS_KEY = 'wdmbg.dashboard.hiddenCards';
 const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
 const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
+const TRAFFIC_WINDOW_KEY = 'wdmbg.trafficWindow';
 
 const DEFAULT_CARD_ORDER = [
   'trafficSummary',
@@ -145,6 +146,26 @@ function saveDisplayRefresh(id: DisplayRefreshId) {
   }
 }
 
+function loadTrafficWindow(): QueryWindow {
+  try {
+    const raw = localStorage.getItem(TRAFFIC_WINDOW_KEY);
+    if (raw && WINDOWS.includes(raw as QueryWindow)) {
+      return raw as QueryWindow;
+    }
+  } catch {
+    // ignore
+  }
+  return '30s';
+}
+
+function saveTrafficWindow(w: QueryWindow) {
+  try {
+    localStorage.setItem(TRAFFIC_WINDOW_KEY, w);
+  } catch {
+    // ignore
+  }
+}
+
 function loadLocalTrafficShown(): boolean {
   try {
     const raw = localStorage.getItem(LOCAL_TRAFFIC_KEY);
@@ -210,7 +231,7 @@ function gitShaLabel(): { short: string; href: string | null } {
 
 export function App() {
   const qc = useQueryClient();
-  const [window, setWindow] = useState<QueryWindow>('30s');
+  const [window, setWindow] = useState<QueryWindow>(() => loadTrafficWindow());
   const [selectedHost, setSelectedHost] = useState<string | null>(() => readIpParam());
   const [live, setLive] = useState<{ t: number; totalBytes: number; flowCount: number } | null>(
     null,
@@ -333,6 +354,11 @@ export function App() {
   const onDisplayRefreshChange = useCallback((id: DisplayRefreshId) => {
     setDisplayRefresh(id);
     saveDisplayRefresh(id);
+  }, []);
+
+  const onTrafficWindowChange = useCallback((w: QueryWindow) => {
+    setWindow(w);
+    saveTrafficWindow(w);
   }, []);
 
   const onLocalTrafficToggle = useCallback(() => {
@@ -923,7 +949,7 @@ export function App() {
                     key={w}
                     type="button"
                     className={w === window ? 'primary' : 'copy-btn'}
-                    onClick={() => setWindow(w)}
+                    onClick={() => onTrafficWindowChange(w)}
                   >
                     {w}
                   </button>
