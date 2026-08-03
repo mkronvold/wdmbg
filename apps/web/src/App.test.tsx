@@ -37,7 +37,16 @@ vi.mock('./api/client', () => ({
         country: 'Local',
       },
     ],
-    topReceivers: [],
+    topReceivers: [
+      {
+        host: '10.0.0.10',
+        label: 'laptop',
+        txBytes: 1_500_000,
+        rxBytes: 3_000_000,
+        totalBytes: 4_500_000,
+        country: 'Local',
+      },
+    ],
     topLocalTalkers: [
       {
         host: '10.0.0.10',
@@ -48,7 +57,16 @@ vi.mock('./api/client', () => ({
         country: 'Local',
       },
     ],
-    topLocalReceivers: [],
+    topLocalReceivers: [
+      {
+        host: '10.0.0.10',
+        label: 'laptop',
+        txBytes: 1_500_000,
+        rxBytes: 3_000_000,
+        totalBytes: 4_500_000,
+        country: 'Local',
+      },
+    ],
     topProtocols: [{ protocol: 'https', bytes: 4_000_000, packets: 100 }],
     hotFlows: [
       {
@@ -238,6 +256,28 @@ describe('App', () => {
     fireEvent.click(view.getByRole('button', { name: 'Show Top protocols' }));
     fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
     expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+  });
+
+  it('uses the same host metric column order on talker and receiver cards', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    const expected = ['Host', 'TX MB', 'RX MB', 'TX Mbps', 'RX Mbps'];
+    for (const title of [
+      'Top talkers',
+      'Top receivers',
+      'Top Local Talkers',
+      'Top Local Receivers',
+    ]) {
+      const section = view.getByRole('heading', { name: title }).closest('section')!;
+      const headers = within(section)
+        .getAllByRole('columnheader')
+        .map((el) => el.textContent?.replace(/[↑↓]/g, '').trim());
+      expect(headers).toEqual(expected);
+    }
   });
 
   it('packs metric columns and marks primary text columns', async () => {
