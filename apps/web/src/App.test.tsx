@@ -439,6 +439,50 @@ describe('App', () => {
     });
   });
 
+  it('persists Traffic window selection across remount', async () => {
+    const { container, unmount } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    const group = view.getByRole('group', { name: 'Traffic window' });
+    fireEvent.click(within(group).getByRole('button', { name: '5m' }));
+    expect(localStorage.getItem('wdmbg.trafficWindow')).toBe('5m');
+    await waitFor(() => {
+      expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '5m')).toBe(true);
+    });
+
+    unmount();
+    vi.mocked(client.fetchDashboard).mockClear();
+    const remounted = renderApp();
+    const remountedView = within(remounted.container);
+    await waitFor(() => {
+      expect(remountedView.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '5m')).toBe(true);
+    expect(
+      within(remountedView.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '5m',
+      }),
+    ).toHaveClass('primary');
+  });
+
+  it('defaults Traffic window to 30s when stored value is invalid', async () => {
+    localStorage.setItem('wdmbg.trafficWindow', 'not-a-window');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '30s')).toBe(true);
+    expect(
+      within(view.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '30s',
+      }),
+    ).toHaveClass('primary');
+  });
+
   it('defaults Resolve Name to Disabled and does not auto-resolve', async () => {
     const { container } = renderApp();
     const view = within(container);
