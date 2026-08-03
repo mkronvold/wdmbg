@@ -747,6 +747,8 @@ describe('App', () => {
       'aria-sort',
       'descending',
     );
+    // Sort state is shown on the column header arrow only — not in the panel legend.
+    expect(within(protocols).getByText(/last 30s/).textContent).not.toMatch(/sorted by/i);
     expect(JSON.parse(localStorage.getItem('wdmbg.tableSort') ?? '{}')).toMatchObject({
       topProtocols: { key: 'p', dir: 'desc' },
     });

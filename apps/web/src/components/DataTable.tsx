@@ -168,10 +168,6 @@ export function DataTable<T>({
     return [...rows].sort((a, b) => mul * compareValues(pick(a), pick(b)));
   }, [columns, rows, sortDir, sortKey]);
 
-  const sortCol = sortKey ? columns.find((c) => c.key === sortKey) : undefined;
-  const legendText =
-    legend && sortCol ? `${legend} · sorted by ${sortCol.header} ${sortDir}` : legend;
-
   const headers = columns.map((c) => c.header);
   const stringRows = sortedRows.map((row) => columns.map((c) => String(c.render(row))));
   const csv = rowsToCsv(headers, stringRows);
@@ -245,7 +241,7 @@ export function DataTable<T>({
             )}
             <h2>{title}</h2>
           </div>
-          {legendText ? <p className="panel-legend">{legendText}</p> : null}
+          {legend ? <p className="panel-legend">{legend}</p> : null}
         </div>
         {editMode ? (
           <div className="panel-actions">
