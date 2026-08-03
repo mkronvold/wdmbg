@@ -637,6 +637,150 @@ a.sha-link:hover {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--theme-accent) 35%, transparent);
 }
 
+.edit-card-btn,
+.delete-card-btn,
+.popout-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  min-width: 2.75rem;
+  padding: 0 0.5rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--theme-border);
+  background: color-mix(in srgb, var(--theme-surface) 88%, transparent);
+  color: var(--theme-muted-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.popout-btn {
+  width: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  font-size: 1rem;
+  text-transform: none;
+}
+
+.edit-card-btn:hover,
+.delete-card-btn:hover,
+.popout-btn:hover {
+  color: var(--theme-text);
+  border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-border));
+}
+
+.edit-card-btn[aria-pressed='true'],
+.delete-card-btn.is-confirm {
+  color: var(--theme-text);
+  background: color-mix(in srgb, var(--theme-accent) 22%, var(--theme-surface));
+  border-color: color-mix(in srgb, var(--theme-accent) 55%, var(--theme-border));
+}
+
+.delete-card-btn.is-confirm {
+  background: color-mix(in srgb, var(--theme-danger, #c44) 28%, var(--theme-surface));
+  border-color: color-mix(in srgb, var(--theme-danger, #c44) 55%, var(--theme-border));
+}
+
+.url-card-add-bar {
+  margin-top: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.url-card-add-btn {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.url-card-form {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--theme-border) 80%, var(--theme-accent));
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--theme-surface) 88%, transparent);
+}
+
+.url-card-add-form {
+  max-width: 36rem;
+}
+
+.url-card-form-row {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.url-card-form-row label {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--theme-muted-text);
+}
+
+.url-card-form-row input {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--theme-border);
+  background: color-mix(in srgb, var(--theme-bg) 70%, var(--theme-surface));
+  color: var(--theme-text);
+}
+
+.url-card-form-row input:focus {
+  outline: 2px solid color-mix(in srgb, var(--theme-accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.url-card-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.url-card-form-error {
+  margin: 0;
+  color: color-mix(in srgb, var(--theme-danger, #c44) 85%, var(--theme-text));
+  font-size: 0.85rem;
+}
+
+.url-card-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: min(100%, 28rem);
+}
+
+.url-card-frame-wrap {
+  width: 100%;
+  min-height: 12rem;
+  border-radius: 0.65rem;
+  overflow: hidden;
+  border: 1px solid var(--theme-border);
+  background: color-mix(in srgb, var(--theme-bg) 80%, var(--theme-surface));
+}
+
+.url-card-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.url-card-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+}
+
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
   font-size: 0.9em;

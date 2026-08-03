@@ -751,4 +751,161 @@ describe('App', () => {
       'host-totals': { key: 'tx', dir: 'desc' },
     });
   });
+
+  it('adds, persists, hides, wides, and deletes URL cards', async () => {
+    const { container, unmount } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    expect(view.queryByRole('button', { name: 'Add URL card' })).not.toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    fireEvent.click(view.getByRole('button', { name: 'Add URL card' }));
+
+    const addForm = view.getByRole('form', { name: 'Add URL card' });
+    fireEvent.change(within(addForm).getByLabelText('Title'), { target: { value: 'Grafana' } });
+    fireEvent.change(within(addForm).getByLabelText('URL'), {
+      target: { value: 'https://grafana.example.com/d/x' },
+    });
+    fireEvent.change(within(addForm).getByLabelText(/Height/), { target: { value: '30' } });
+    fireEvent.click(within(addForm).getByRole('button', { name: 'Add card' }));
+
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Grafana' })).toBeInTheDocument();
+    });
+
+    const panel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
+    const iframe = panel.querySelector('iframe');
+    expect(iframe).toBeTruthy();
+    expect(iframe).toHaveAttribute('src', 'https://grafana.example.com/d/x');
+    expect(iframe).toHaveAttribute(
+      'sandbox',
+      'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox',
+    );
+    expect(iframe).toHaveAttribute('referrerpolicy', 'no-referrer');
+    expect(iframe).toHaveAttribute('loading', 'lazy');
+    expect(panel.querySelector('.url-card-frame-wrap')).toHaveStyle({ height: '30rem' });
+
+    const stored = JSON.parse(localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]') as Array<{
+      id: string;
+      title: string;
+      url: string;
+      heightRem?: number;
+    }>;
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({
+      title: 'Grafana',
+      url: 'https://grafana.example.com/d/x',
+      heightRem: 30,
+    });
+    expect(stored[0]!.id.startsWith('url:')).toBe(true);
+    const urlId = stored[0]!.id;
+
+    const order = JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]') as string[];
+    expect(order).toContain(urlId);
+
+    fireEvent.click(view.getByRole('button', { name: 'Hide Grafana' }));
+    expect(panel).toHaveClass('is-hidden-card');
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    expect(view.queryByRole('heading', { name: 'Grafana' })).not.toBeInTheDocument();
+
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    expect(view.getByRole('heading', { name: 'Grafana' })).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Show Grafana' }));
+    fireEvent.click(view.getByRole('button', { name: 'Make Grafana full width' }));
+    expect(view.getByRole('heading', { name: 'Grafana' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).toContain(urlId);
+
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    const viewPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
+    const popout = within(viewPanel).getByRole('link', { name: 'Pop out Grafana' });
+    expect(popout).toHaveAttribute('href', 'https://grafana.example.com/d/x');
+    expect(popout).toHaveAttribute('target', '_blank');
+    expect(popout).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+    unmount();
+    const again = renderApp();
+    const view2 = within(again.container);
+    await waitFor(() => {
+      expect(view2.getByRole('heading', { name: 'Grafana' })).toBeInTheDocument();
+    });
+    expect(view2.getByRole('heading', { name: 'Grafana' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
+
+    fireEvent.click(view2.getByRole('button', { name: 'Edit layout' }));
+    fireEvent.click(view2.getByRole('button', { name: 'Delete Grafana' }));
+    fireEvent.click(view2.getByRole('button', { name: 'Confirm delete Grafana' }));
+    expect(view2.queryByRole('heading', { name: 'Grafana' })).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]')).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]')).not.toContain(
+      urlId,
+    );
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).not.toContain(
+      urlId,
+    );
+  });
+
+  it('rejects invalid URL card URLs in the add form', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    fireEvent.click(view.getByRole('button', { name: 'Add URL card' }));
+    const addForm = view.getByRole('form', { name: 'Add URL card' });
+    fireEvent.change(within(addForm).getByLabelText('Title'), { target: { value: 'Bad' } });
+    fireEvent.change(within(addForm).getByLabelText('URL'), {
+      target: { value: 'javascript:alert(1)' },
+    });
+    fireEvent.click(within(addForm).getByRole('button', { name: 'Add card' }));
+    expect(view.getByRole('alert')).toHaveTextContent(/https/i);
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]')).toEqual([]);
+  });
+
+  it('drops orphan url card refs and invalid defs on load', async () => {
+    localStorage.setItem(
+      'wdmbg.dashboard.urlCards',
+      JSON.stringify([
+        {
+          id: 'url:keep-me',
+          title: 'Keep',
+          url: 'https://keep.example.com',
+        },
+        {
+          id: 'url:bad-js',
+          title: 'Nope',
+          url: 'javascript:alert(1)',
+        },
+      ]),
+    );
+    localStorage.setItem(
+      'wdmbg.dashboard.cardOrder',
+      JSON.stringify(['topTalkers', 'url:keep-me', 'url:missing', 'hotFlows']),
+    );
+    localStorage.setItem(
+      'wdmbg.dashboard.hiddenCards',
+      JSON.stringify(['url:missing', 'topProtocols']),
+    );
+    localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['url:keep-me', 'url:gone']));
+
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Keep' })).toBeInTheDocument();
+    });
+    expect(view.queryByRole('heading', { name: 'Nope' })).not.toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Keep' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
+
+    const order = JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]') as string[];
+    // order is only rewritten on change; loaders filter in memory
+    expect(order).toContain('url:keep-me');
+    expect(view.queryByRole('heading', { name: 'missing' })).not.toBeInTheDocument();
+  });
 });
