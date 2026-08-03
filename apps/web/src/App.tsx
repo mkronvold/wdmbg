@@ -1,8 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { CountryRow, FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contracts';
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
+import {
+  collectUnnamedFromDashboard,
+  loadResolveNameMode,
+  queueAutoResolve,
+  saveResolveNameMode,
+  type ResolveNameMode,
+} from './autoResolve';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
@@ -159,6 +166,7 @@ function gitShaLabel(): { short: string; href: string | null } {
 }
 
 export function App() {
+  const qc = useQueryClient();
   const [window, setWindow] = useState<QueryWindow>('30s');
   const [selectedHost, setSelectedHost] = useState<string | null>(() => readIpParam());
   const [live, setLive] = useState<{ t: number; totalBytes: number; flowCount: number } | null>(
@@ -172,6 +180,9 @@ export function App() {
   );
   const [localTrafficShown, setLocalTrafficShown] = useState<boolean>(() =>
     loadLocalTrafficShown(),
+  );
+  const [resolveNameMode, setResolveNameMode] = useState<ResolveNameMode>(() =>
+    loadResolveNameMode(),
   );
   const [theme, setTheme] = useState<ThemeId>(() => resolveInitialTheme());
   const sha = useMemo(() => gitShaLabel(), []);
@@ -214,6 +225,16 @@ export function App() {
     queryFn: () => fetchDashboard(window, excludeLocal),
     refetchInterval,
   });
+
+  useEffect(() => {
+    if (resolveNameMode !== 'auto' || !dashboard.data || !dashboard.isSuccess) return;
+    const ips = collectUnnamedFromDashboard(dashboard.data);
+    queueAutoResolve(ips, async () => {
+      await qc.invalidateQueries({ queryKey: ['dashboard'] });
+      await qc.invalidateQueries({ queryKey: ['host'] });
+      await qc.invalidateQueries({ queryKey: ['host-flows'] });
+    });
+  }, [resolveNameMode, dashboard.data, dashboard.isSuccess, dashboard.dataUpdatedAt, qc]);
 
   useEffect(() => {
     if (paused) return;
@@ -273,6 +294,14 @@ export function App() {
     setLocalTrafficShown((prev) => {
       const next = !prev;
       saveLocalTrafficShown(next);
+      return next;
+    });
+  }, []);
+
+  const onResolveNameToggle = useCallback(() => {
+    setResolveNameMode((prev) => {
+      const next: ResolveNameMode = prev === 'auto' ? 'disabled' : 'auto';
+      saveResolveNameMode(next);
       return next;
     });
   }, []);
@@ -622,6 +651,21 @@ export function App() {
               </button>
             </div>
             <div className="window-control">
+              <p className="window-label">Resolve Name</p>
+              <button
+                type="button"
+                className={resolveNameMode === 'auto' ? 'primary' : 'copy-btn'}
+                aria-pressed={resolveNameMode === 'auto'}
+                aria-label={
+                  resolveNameMode === 'auto' ? 'Resolve Name Auto' : 'Resolve Name Disabled'
+                }
+                title={resolveNameMode === 'auto' ? 'Resolve Name Auto' : 'Resolve Name Disabled'}
+                onClick={onResolveNameToggle}
+              >
+                {resolveNameMode === 'auto' ? 'Auto' : 'Disabled'}
+              </button>
+            </div>
+            <div className="window-control">
               <p className="window-label" id="traffic-window-label">
                 Traffic window
               </p>
@@ -673,6 +717,7 @@ export function App() {
           window={window}
           excludeLocal={excludeLocal}
           showCountry={geoipPresent}
+          autoResolve={resolveNameMode === 'auto'}
           onSelectHost={selectHost}
           onClose={closeHost}
         />

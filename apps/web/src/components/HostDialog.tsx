@@ -3,6 +3,7 @@ import type { FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contra
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
 import { useEffect, useState } from 'react';
 import { clearAlias, fetchHost, fetchHostFlows, putAlias, resolveHosts } from '../api/client';
+import { collectUnnamedFromHost, queueAutoResolve } from '../autoResolve';
 import { DataTable } from './DataTable';
 import { formatMb, formatMbps, hostLabel, windowLegend } from './format';
 
@@ -12,6 +13,8 @@ export interface HostDialogProps {
   excludeLocal?: boolean;
   /** When false, omit Country column (GeoIP DB not present). */
   showCountry?: boolean;
+  /** When true, automatically resolve unnamed host/peer/flow IPs. */
+  autoResolve?: boolean;
   /** Open/switch detailed view to another host (updates parent + ?ip=). */
   onSelectHost?: (host: string) => void;
   onClose: () => void;
@@ -24,6 +27,7 @@ export function HostDialog({
   window,
   excludeLocal = false,
   showCountry = false,
+  autoResolve = false,
   onSelectHost,
   onClose,
 }: HostDialogProps) {
@@ -48,6 +52,27 @@ export function HostDialog({
     queryKey: ['host-flows', host, window, excludeLocal],
     queryFn: () => fetchHostFlows(host, window, excludeLocal),
   });
+
+  useEffect(() => {
+    if (!autoResolve) return;
+    if (!summary.isSuccess && !flows.isSuccess) return;
+    const ips = collectUnnamedFromHost(host, summary.data, flows.data);
+    queueAutoResolve(ips, async () => {
+      await qc.invalidateQueries({ queryKey: ['host', host] });
+      await qc.invalidateQueries({ queryKey: ['host-flows', host] });
+      await qc.invalidateQueries({ queryKey: ['dashboard'] });
+    });
+  }, [
+    autoResolve,
+    host,
+    summary.data,
+    summary.isSuccess,
+    summary.dataUpdatedAt,
+    flows.data,
+    flows.isSuccess,
+    flows.dataUpdatedAt,
+    qc,
+  ]);
 
   const aliasMut = useMutation({
     mutationFn: () => putAlias(host, aliasDraft.trim()),
