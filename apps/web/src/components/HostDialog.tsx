@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contracts';
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { clearAlias, fetchHost, fetchHostFlows, putAlias, resolveHosts } from '../api/client';
 import { DataTable } from './DataTable';
 import { formatMb, formatMbps, hostLabel, windowLegend } from './format';
@@ -10,16 +10,32 @@ export interface HostDialogProps {
   host: string;
   window: QueryWindow;
   excludeLocal?: boolean;
+  /** Open/switch detailed view to another host (updates parent + ?ip=). */
+  onSelectHost?: (host: string) => void;
   onClose: () => void;
 }
 
 type MetricRow = { metric: string; value: string };
 
-export function HostDialog({ host, window, excludeLocal = false, onClose }: HostDialogProps) {
+export function HostDialog({
+  host,
+  window,
+  excludeLocal = false,
+  onSelectHost,
+  onClose,
+}: HostDialogProps) {
   const qc = useQueryClient();
   const [aliasDraft, setAliasDraft] = useState('');
   const secs = WINDOW_SECONDS[window];
   const legend = windowLegend(window);
+
+  useEffect(() => {
+    setAliasDraft('');
+  }, [host]);
+
+  const selectHost = (next: string) => {
+    onSelectHost?.(next);
+  };
 
   const summary = useQuery({
     queryKey: ['host', host, window, excludeLocal],
@@ -143,6 +159,7 @@ export function HostDialog({ host, window, excludeLocal = false, onClose }: Host
                 cellClassName: 'cell-host',
                 render: (r: TalkerRow) => hostLabel(r.host, r.label),
                 sortValue: (r: TalkerRow) => r.label ?? r.host,
+                onCellClick: (r: TalkerRow) => selectHost(r.host),
               },
               {
                 key: 'tx',
@@ -192,6 +209,7 @@ export function HostDialog({ host, window, excludeLocal = false, onClose }: Host
                 cellClassName: 'cell-host',
                 render: (r: FlowRow) => hostLabel(r.src, r.srcLabel),
                 sortValue: (r: FlowRow) => r.srcLabel ?? r.src,
+                onCellClick: (r: FlowRow) => selectHost(r.src),
               },
               {
                 key: 'sp',
@@ -206,6 +224,7 @@ export function HostDialog({ host, window, excludeLocal = false, onClose }: Host
                 cellClassName: 'cell-host',
                 render: (r: FlowRow) => hostLabel(r.dst, r.dstLabel),
                 sortValue: (r: FlowRow) => r.dstLabel ?? r.dst,
+                onCellClick: (r: FlowRow) => selectHost(r.dst),
               },
               {
                 key: 'dp',

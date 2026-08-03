@@ -348,7 +348,7 @@ export function App() {
             key: 'h',
             header: 'Host',
             cellClassName: 'cell-host',
-            render: (r: TalkerRow) => r.label ?? r.host,
+            render: (r: TalkerRow) => hostLabel(r.host, r.label),
             sortValue: (r: TalkerRow) => r.label ?? r.host,
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
@@ -399,7 +399,7 @@ export function App() {
             key: 'h',
             header: 'Host',
             cellClassName: 'cell-host',
-            render: (r: TalkerRow) => r.label ?? r.host,
+            render: (r: TalkerRow) => hostLabel(r.host, r.label),
             sortValue: (r: TalkerRow) => r.label ?? r.host,
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
@@ -664,9 +664,11 @@ export function App() {
 
       {selectedHost && (
         <HostDialog
+          key={selectedHost}
           host={selectedHost}
           window={window}
           excludeLocal={excludeLocal}
+          onSelectHost={selectHost}
           onClose={closeHost}
         />
       )}

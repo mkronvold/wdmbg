@@ -65,13 +65,42 @@ vi.mock('./api/client', () => ({
     txRateBps: 0,
     rxRateBps: 0,
     topProtocols: [],
-    topPeers: [],
+    topPeers:
+      host === '10.0.0.10'
+        ? [
+            {
+              host: '1.1.1.1',
+              label: 'cloudflare',
+              txBytes: 100,
+              rxBytes: 200,
+              totalBytes: 300,
+              country: 'Unknown',
+            },
+          ]
+        : [],
   })),
   fetchHostFlows: vi.fn(async (host: string) => ({
     host,
     window: '30s',
     generatedAt: '2026-07-30T12:00:00.000Z',
-    flows: [],
+    flows:
+      host === '10.0.0.10'
+        ? [
+            {
+              src: '10.0.0.10',
+              srcPort: 40000,
+              dst: '8.8.8.8',
+              dstPort: 53,
+              l4: 'udp',
+              l7: 'dns',
+              bytes: 120,
+              packets: 2,
+              txBytes: 40,
+              rxBytes: 80,
+              srcLabel: 'laptop',
+            },
+          ]
+        : [],
   })),
   putAlias: vi.fn(),
   clearAlias: vi.fn(),
@@ -178,9 +207,32 @@ describe('App', () => {
     await waitFor(() => {
       expect(view.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    fireEvent.click(view.getAllByRole('button', { name: 'laptop' })[0]!);
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
     expect(await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
     fireEvent.click(view.getByRole('button', { name: 'Close' }));
+  });
+
+  it('switches HostDialog when clicking peer or flow host inside the dialog', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    expect(await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
+    expect(window.location.search).toContain('ip=10.0.0.10');
+
+    fireEvent.click(await view.findByRole('button', { name: /cloudflare \(1\.1\.1\.1\)/ }));
+    expect(await view.findByRole('dialog', { name: /Host 1\.1\.1\.1/i })).toBeInTheDocument();
+    expect(window.location.search).toContain('ip=1.1.1.1');
+
+    fireEvent.click(view.getByRole('button', { name: 'Close' }));
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    expect(await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
+    fireEvent.click(await view.findByRole('button', { name: '8.8.8.8' }));
+    expect(await view.findByRole('dialog', { name: /Host 8\.8\.8\.8/i })).toBeInTheDocument();
+    expect(window.location.search).toContain('ip=8.8.8.8');
   });
 
   it('changes theme via select and persists preference', async () => {
