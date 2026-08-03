@@ -136,6 +136,8 @@ describe('trafficSummarySchema', () => {
       generatedAt: '2026-07-30T12:00:00.000Z',
       topTalkers: [],
       topReceivers: [],
+      topLocalTalkers: [],
+      topLocalReceivers: [],
       topProtocols: [],
       hotFlows: [],
       topCountries: [],

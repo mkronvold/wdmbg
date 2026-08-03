@@ -17,6 +17,7 @@ import {
   saveResolveNameMode,
   type ResolveNameMode,
 } from './autoResolve';
+import { reorderCards } from './cardOrder';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
@@ -32,6 +33,7 @@ import {
 const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
 const CARD_ORDER_KEY = 'wdmbg.dashboard.cardOrder';
+const HIDDEN_CARDS_KEY = 'wdmbg.dashboard.hiddenCards';
 const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
 const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 
@@ -39,6 +41,8 @@ const DEFAULT_CARD_ORDER = [
   'trafficSummary',
   'topTalkers',
   'topReceivers',
+  'topLocalTalkers',
+  'topLocalReceivers',
   'topProtocols',
   'hotFlows',
   'topCountries',
@@ -87,6 +91,35 @@ function loadCardOrder(): CardId[] {
 function saveCardOrder(order: CardId[]) {
   try {
     localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function loadHiddenCards(): CardId[] {
+  try {
+    const raw = localStorage.getItem(HIDDEN_CARDS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const known = new Set<string>(DEFAULT_CARD_ORDER);
+    const seen = new Set<string>();
+    const hidden: CardId[] = [];
+    for (const id of parsed) {
+      if (typeof id === 'string' && known.has(id) && !seen.has(id)) {
+        hidden.push(id as CardId);
+        seen.add(id);
+      }
+    }
+    return hidden;
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenCards(ids: CardId[]) {
+  try {
+    localStorage.setItem(HIDDEN_CARDS_KEY, JSON.stringify(ids));
   } catch {
     // ignore quota / private mode
   }
@@ -183,6 +216,8 @@ export function App() {
     null,
   );
   const [cardOrder, setCardOrder] = useState<CardId[]>(() => loadCardOrder());
+  const [hiddenCards, setHiddenCards] = useState<CardId[]>(() => loadHiddenCards());
+  const [editMode, setEditMode] = useState(false);
   const [draggingId, setDraggingId] = useState<CardId | null>(null);
   const [dragOverId, setDragOverId] = useState<CardId | null>(null);
   const [displayRefresh, setDisplayRefresh] = useState<DisplayRefreshId>(() =>
@@ -326,30 +361,18 @@ export function App() {
     setDraggingId(cardId as CardId);
   }, []);
 
-  const onDragOver = useCallback((event: DragEvent<HTMLElement>, cardId: string) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    setDragOverId(cardId as CardId);
-  }, []);
-
-  const onDragLeave = useCallback((_event: DragEvent<HTMLElement>, cardId: string) => {
-    setDragOverId((cur) => (cur === cardId ? null : cur));
-  }, []);
-
-  const onDrop = useCallback(
-    (event: DragEvent<HTMLElement>, targetId: string) => {
+  const onDragOver = useCallback(
+    (event: DragEvent<HTMLElement>, cardId: string) => {
       event.preventDefault();
-      const sourceId = (event.dataTransfer.getData('text/plain') || draggingId) as CardId | null;
-      setDragOverId(null);
-      setDraggingId(null);
+      event.dataTransfer.dropEffect = 'move';
+      const targetId = cardId as CardId;
+      setDragOverId(targetId);
+      // Browsers often block dataTransfer.getData during dragover; use React state.
+      const sourceId = draggingId;
       if (!sourceId || sourceId === targetId) return;
       setCardOrder((prev) => {
-        const next = [...prev];
-        const from = next.indexOf(sourceId);
-        const to = next.indexOf(targetId as CardId);
-        if (from < 0 || to < 0) return prev;
-        next.splice(from, 1);
-        next.splice(to, 0, sourceId);
+        const next = reorderCards(prev, sourceId, targetId);
+        if (next === prev) return prev;
         saveCardOrder(next);
         return next;
       });
@@ -357,19 +380,48 @@ export function App() {
     [draggingId],
   );
 
+  const onDragLeave = useCallback((_event: DragEvent<HTMLElement>, cardId: string) => {
+    setDragOverId((cur) => (cur === cardId ? null : cur));
+  }, []);
+
+  const onDrop = useCallback((event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setDragOverId(null);
+    setDraggingId(null);
+  }, []);
+
   const onDragEnd = useCallback(() => {
     setDraggingId(null);
     setDragOverId(null);
   }, []);
 
-  const dragProps = {
+  const onToggleHidden = useCallback((cardId: CardId) => {
+    setHiddenCards((prev) => {
+      const set = new Set(prev);
+      if (set.has(cardId)) set.delete(cardId);
+      else set.add(cardId);
+      const next = DEFAULT_CARD_ORDER.filter((id) => set.has(id));
+      saveHiddenCards(next);
+      return next;
+    });
+  }, []);
+
+  const hiddenSet = useMemo(() => new Set(hiddenCards), [hiddenCards]);
+
+  const cardChrome = (cardId: CardId) => ({
+    cardId,
     draggable: true as const,
+    editMode,
+    hidden: hiddenSet.has(cardId),
+    onToggleHidden: () => onToggleHidden(cardId),
+    isDragging: draggingId === cardId,
+    isDragOver: dragOverId === cardId,
     onDragStart,
     onDragOver,
     onDragLeave,
     onDrop,
     onDragEnd,
-  };
+  });
 
   const summaryRows: SummaryRow[] | null = dashboard.data?.summary
     ? [
@@ -382,13 +434,10 @@ export function App() {
     trafficSummary: summaryRows ? (
       <DataTable
         key="trafficSummary"
-        cardId="trafficSummary"
         title="Traffic summary"
         legend={legend}
         rows={summaryRows}
-        isDragging={draggingId === 'trafficSummary'}
-        isDragOver={dragOverId === 'trafficSummary'}
-        {...dragProps}
+        {...cardChrome('trafficSummary')}
         columns={[
           {
             key: 'b',
@@ -431,13 +480,10 @@ export function App() {
     topTalkers: dashboard.data ? (
       <DataTable
         key="topTalkers"
-        cardId="topTalkers"
         title="Top talkers"
         legend={legend}
         rows={dashboard.data.topTalkers}
-        isDragging={draggingId === 'topTalkers'}
-        isDragOver={dragOverId === 'topTalkers'}
-        {...dragProps}
+        {...cardChrome('topTalkers')}
         columns={[
           {
             key: 'h',
@@ -492,13 +538,126 @@ export function App() {
     topReceivers: dashboard.data ? (
       <DataTable
         key="topReceivers"
-        cardId="topReceivers"
         title="Top receivers"
         legend={legend}
         rows={dashboard.data.topReceivers}
-        isDragging={draggingId === 'topReceivers'}
-        isDragOver={dragOverId === 'topReceivers'}
-        {...dragProps}
+        {...cardChrome('topReceivers')}
+        columns={[
+          {
+            key: 'h',
+            header: 'Host',
+            width: 'primary',
+            cellClassName: 'cell-host',
+            render: (r: TalkerRow) => hostLabel(r.host, r.label),
+            sortValue: (r: TalkerRow) => r.label ?? r.host,
+            onCellClick: (r: TalkerRow) => selectHost(r.host),
+          },
+          {
+            key: 'rx',
+            header: 'RX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.rxBytes),
+            sortValue: (r: TalkerRow) => r.rxBytes,
+          },
+          {
+            key: 'tx',
+            header: 'TX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.txBytes),
+            sortValue: (r: TalkerRow) => r.txBytes,
+          },
+          {
+            key: 'rxr',
+            header: 'RX Mbps',
+            numeric: true,
+            render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: TalkerRow) => r.rxBytes,
+          },
+          {
+            key: 'txr',
+            header: 'TX Mbps',
+            numeric: true,
+            render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
+            sortValue: (r: TalkerRow) => r.txBytes,
+          },
+          ...(geoipPresent
+            ? [
+                {
+                  key: 'c',
+                  header: 'Country',
+                  width: 'min' as const,
+                  render: (r: TalkerRow) => r.country ?? '—',
+                },
+              ]
+            : []),
+        ]}
+      />
+    ) : null,
+    topLocalTalkers: dashboard.data ? (
+      <DataTable
+        key="topLocalTalkers"
+        title="Top Local Talkers"
+        legend={legend}
+        rows={dashboard.data.topLocalTalkers}
+        {...cardChrome('topLocalTalkers')}
+        columns={[
+          {
+            key: 'h',
+            header: 'Host',
+            width: 'primary',
+            cellClassName: 'cell-host',
+            render: (r: TalkerRow) => hostLabel(r.host, r.label),
+            sortValue: (r: TalkerRow) => r.label ?? r.host,
+            onCellClick: (r: TalkerRow) => selectHost(r.host),
+          },
+          {
+            key: 'tx',
+            header: 'TX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.txBytes),
+            sortValue: (r: TalkerRow) => r.txBytes,
+          },
+          {
+            key: 'rx',
+            header: 'RX MB',
+            numeric: true,
+            render: (r: TalkerRow) => formatMb(r.rxBytes),
+            sortValue: (r: TalkerRow) => r.rxBytes,
+          },
+          {
+            key: 'txr',
+            header: 'TX Mbps',
+            numeric: true,
+            render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
+            sortValue: (r: TalkerRow) => r.txBytes,
+          },
+          {
+            key: 'rxr',
+            header: 'RX Mbps',
+            numeric: true,
+            render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: TalkerRow) => r.rxBytes,
+          },
+          ...(geoipPresent
+            ? [
+                {
+                  key: 'c',
+                  header: 'Country',
+                  width: 'min' as const,
+                  render: (r: TalkerRow) => r.country ?? '—',
+                },
+              ]
+            : []),
+        ]}
+      />
+    ) : null,
+    topLocalReceivers: dashboard.data ? (
+      <DataTable
+        key="topLocalReceivers"
+        title="Top Local Receivers"
+        legend={legend}
+        rows={dashboard.data.topLocalReceivers}
+        {...cardChrome('topLocalReceivers')}
         columns={[
           {
             key: 'h',
@@ -553,13 +712,10 @@ export function App() {
     topProtocols: dashboard.data ? (
       <DataTable
         key="topProtocols"
-        cardId="topProtocols"
         title="Top protocols"
         legend={legend}
         rows={dashboard.data.topProtocols}
-        isDragging={draggingId === 'topProtocols'}
-        isDragOver={dragOverId === 'topProtocols'}
-        {...dragProps}
+        {...cardChrome('topProtocols')}
         columns={[
           {
             key: 'p',
@@ -587,13 +743,10 @@ export function App() {
     hotFlows: dashboard.data ? (
       <DataTable
         key="hotFlows"
-        cardId="hotFlows"
         title="Hot flows"
         legend={legend}
         rows={dashboard.data.hotFlows}
-        isDragging={draggingId === 'hotFlows'}
-        isDragOver={dragOverId === 'hotFlows'}
-        {...dragProps}
+        {...cardChrome('hotFlows')}
         columns={[
           {
             key: 'src',
@@ -657,13 +810,10 @@ export function App() {
       dashboard.data && geoipPresent ? (
         <DataTable
           key="topCountries"
-          cardId="topCountries"
           title="Top traffic by country"
           legend={legend}
           rows={dashboard.data.topCountries}
-          isDragging={draggingId === 'topCountries'}
-          isDragOver={dragOverId === 'topCountries'}
-          {...dragProps}
+          {...cardChrome('topCountries')}
           columns={[
             { key: 'c', header: 'Country', width: 'primary', render: (r: CountryRow) => r.country },
             {
@@ -678,7 +828,11 @@ export function App() {
       ) : null,
   };
 
-  const visibleCards = cardOrder.filter((id) => id !== 'topCountries' || geoipPresent);
+  const visibleCards = cardOrder.filter((id) => {
+    if (id === 'topCountries' && !geoipPresent) return false;
+    if (!editMode && hiddenSet.has(id)) return false;
+    return true;
+  });
 
   return (
     <div className="app wide">
@@ -820,6 +974,15 @@ export function App() {
         ) : (
           <span className="sha-link muted">{sha.short}</span>
         )}
+        <button
+          type="button"
+          className="footer-edit-link"
+          aria-pressed={editMode}
+          aria-label={editMode ? 'Done editing layout' : 'Edit layout'}
+          onClick={() => setEditMode((v) => !v)}
+        >
+          {editMode ? 'Done' : 'Edit'}
+        </button>
       </footer>
     </div>
   );

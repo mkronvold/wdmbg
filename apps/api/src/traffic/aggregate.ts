@@ -119,6 +119,26 @@ export function topReceivers(flows: StoredFlow[], limit = 10, labels?: LabelLook
   return sortByBytesDesc([...buildHostStats(flows, labels).values()], (r) => r.rxBytes, limit);
 }
 
+/** Rank LAN hosts only by TX (after caller has applied filterFlows). */
+export function topLocalTalkers(
+  flows: StoredFlow[],
+  limit = 10,
+  labels?: LabelLookup,
+): TalkerRow[] {
+  const local = [...buildHostStats(flows, labels).values()].filter((r) => isLocalAddress(r.host));
+  return sortByBytesDesc(local, (r) => r.txBytes, limit);
+}
+
+/** Rank LAN hosts only by RX (after caller has applied filterFlows). */
+export function topLocalReceivers(
+  flows: StoredFlow[],
+  limit = 10,
+  labels?: LabelLookup,
+): TalkerRow[] {
+  const local = [...buildHostStats(flows, labels).values()].filter((r) => isLocalAddress(r.host));
+  return sortByBytesDesc(local, (r) => r.rxBytes, limit);
+}
+
 export function topProtocols(flows: StoredFlow[], limit = 10): ProtocolRow[] {
   const map = new Map<string, ProtocolRow>();
   for (const flow of flows) {
@@ -312,6 +332,8 @@ export function buildDashboard(
     generatedAt: new Date(nowSec * 1000).toISOString(),
     topTalkers: topTalkers(flows, 10, labels),
     topReceivers: topReceivers(flows, 10, labels),
+    topLocalTalkers: topLocalTalkers(flows, 10, labels),
+    topLocalReceivers: topLocalReceivers(flows, 10, labels),
     topProtocols: topProtocols(flows),
     hotFlows: hotFlows(flows, 15, labels),
     topCountries: topCountries(flows, 10, labels),
