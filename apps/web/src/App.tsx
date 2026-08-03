@@ -1,5 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CountryRow, FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contracts';
+import type {
+  CountryRow,
+  FlowRow,
+  ProtocolRow,
+  QueryWindow,
+  TalkerRow,
+  TrafficBucket,
+} from '@wdmbg/contracts';
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
@@ -29,12 +36,15 @@ const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
 const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 
 const DEFAULT_CARD_ORDER = [
+  'trafficSummary',
   'topTalkers',
   'topReceivers',
   'topProtocols',
   'hotFlows',
   'topCountries',
 ] as const;
+
+type SummaryRow = { bucket: 'Local' | 'Internet' } & TrafficBucket;
 
 type CardId = (typeof DEFAULT_CARD_ORDER)[number];
 
@@ -361,7 +371,62 @@ export function App() {
     onDragEnd,
   };
 
+  const summaryRows: SummaryRow[] | null = dashboard.data?.summary
+    ? [
+        { bucket: 'Local', ...dashboard.data.summary.local },
+        { bucket: 'Internet', ...dashboard.data.summary.internet },
+      ]
+    : null;
+
   const cards: Record<CardId, ReactNode> = {
+    trafficSummary: summaryRows ? (
+      <DataTable
+        key="trafficSummary"
+        cardId="trafficSummary"
+        title="Traffic summary"
+        legend={legend}
+        rows={summaryRows}
+        isDragging={draggingId === 'trafficSummary'}
+        isDragOver={dragOverId === 'trafficSummary'}
+        {...dragProps}
+        columns={[
+          {
+            key: 'b',
+            header: 'Bucket',
+            render: (r: SummaryRow) => r.bucket,
+            sortValue: (r: SummaryRow) => r.bucket,
+          },
+          {
+            key: 'tx',
+            header: 'TX MB',
+            numeric: true,
+            render: (r: SummaryRow) => formatMb(r.txBytes),
+            sortValue: (r: SummaryRow) => r.txBytes,
+          },
+          {
+            key: 'rx',
+            header: 'RX MB',
+            numeric: true,
+            render: (r: SummaryRow) => formatMb(r.rxBytes),
+            sortValue: (r: SummaryRow) => r.rxBytes,
+          },
+          {
+            key: 'txr',
+            header: 'TX Rate',
+            numeric: true,
+            render: (r: SummaryRow) => formatMbps(r.txBytes, secs),
+            sortValue: (r: SummaryRow) => r.txBytes,
+          },
+          {
+            key: 'rxr',
+            header: 'RX Rate',
+            numeric: true,
+            render: (r: SummaryRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: SummaryRow) => r.rxBytes,
+          },
+        ]}
+      />
+    ) : null,
     topTalkers: dashboard.data ? (
       <DataTable
         key="topTalkers"

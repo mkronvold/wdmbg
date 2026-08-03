@@ -55,14 +55,18 @@ vi.mock('./api/client', () => ({
       },
     ],
     topCountries: [{ country: 'Unknown', bytes: 9_000_000 }],
+    summary: {
+      local: { txBytes: 250_000, rxBytes: 100_000, totalBytes: 350_000 },
+      internet: { txBytes: 3_000_000, rxBytes: 9_000_000, totalBytes: 12_000_000 },
+    },
   })),
   fetchHost: vi.fn(async (host: string) => ({
     host,
     window: '30s',
     generatedAt: '2026-07-30T12:00:00.000Z',
-    txBytes: 0,
-    rxBytes: 0,
-    totalBytes: 0,
+    txBytes: host === '10.0.0.10' ? 1_000_000 : 0,
+    rxBytes: host === '10.0.0.10' ? 2_000_000 : 0,
+    totalBytes: host === '10.0.0.10' ? 3_000_000 : 0,
     txRateBps: 0,
     rxRateBps: 0,
     topProtocols: [],
@@ -186,10 +190,39 @@ describe('App', () => {
     expect(view.getAllByRole('columnheader', { name: /TX Mbps/ }).length).toBeGreaterThan(0);
     expect(view.getAllByRole('columnheader', { name: /TX MB/ }).length).toBeGreaterThan(0);
     expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
+    expect(view.getByText('Local')).toBeInTheDocument();
+    expect(view.getByText('Internet')).toBeInTheDocument();
+    expect(view.getByRole('columnheader', { name: 'TX Rate' })).toBeInTheDocument();
+    expect(view.getByRole('columnheader', { name: 'RX Rate' })).toBeInTheDocument();
     expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
     expect(view.getByText('sha-dev')).toBeInTheDocument();
+  });
+
+  it('shows HostDialog totals with metric names as column headers', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    const dlg = within(dialog);
+    await waitFor(() => {
+      expect(dlg.getByRole('heading', { name: 'Totals' })).toBeInTheDocument();
+    });
+    const totalsPanel = dlg.getByRole('heading', { name: 'Totals' }).closest('section');
+    expect(totalsPanel).toBeTruthy();
+    const totals = within(totalsPanel as HTMLElement);
+    expect(totals.getByRole('columnheader', { name: 'TX MB' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'RX MB' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'Total MB' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'TX Mbps' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'RX Mbps' })).toBeInTheDocument();
+    expect(totals.queryByRole('columnheader', { name: 'Metric' })).not.toBeInTheDocument();
+    expect(totals.queryByRole('columnheader', { name: 'Value' })).not.toBeInTheDocument();
   });
 
   it('opens host details from hot flow Src/Dst IPs and deep-links', async () => {
