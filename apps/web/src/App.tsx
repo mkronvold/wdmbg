@@ -777,7 +777,7 @@ export function App() {
           {
             key: 'src',
             header: 'Src',
-            width: 'min',
+            width: 'share',
             cellClassName: 'cell-host',
             render: (r: FlowRow) => hostLabel(r.src, r.srcLabel),
             sortValue: (r: FlowRow) => r.srcLabel ?? r.src,
@@ -793,7 +793,7 @@ export function App() {
           {
             key: 'dst',
             header: 'Dst',
-            width: 'primary',
+            width: 'share',
             cellClassName: 'cell-host',
             render: (r: FlowRow) => hostLabel(r.dst, r.dstLabel),
             sortValue: (r: FlowRow) => r.dstLabel ?? r.dst,
