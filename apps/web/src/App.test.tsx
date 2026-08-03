@@ -38,6 +38,17 @@ vi.mock('./api/client', () => ({
       },
     ],
     topReceivers: [],
+    topLocalTalkers: [
+      {
+        host: '10.0.0.10',
+        label: 'laptop',
+        txBytes: 3_000_000,
+        rxBytes: 1_500_000,
+        totalBytes: 4_500_000,
+        country: 'Local',
+      },
+    ],
+    topLocalReceivers: [],
     topProtocols: [{ protocol: 'https', bytes: 4_000_000, packets: 100 }],
     hotFlows: [
       {
@@ -195,10 +206,38 @@ describe('App', () => {
     expect(view.getByText('Internet')).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'TX Rate' })).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'RX Rate' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Local Talkers' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Local Receivers' })).toBeInTheDocument();
+    // Drag handles are edit-mode only
+    expect(view.queryByLabelText(/Drag to reorder Top talkers/i)).not.toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
     expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Hide Top talkers' })).toBeInTheDocument();
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
     expect(view.getByText('sha-dev')).toBeInTheDocument();
+  });
+
+  it('hides cards outside edit mode and restores them', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+    });
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    fireEvent.click(view.getByRole('button', { name: 'Hide Top protocols' }));
+    expect(view.getByRole('heading', { name: 'Top protocols' }).closest('section')).toHaveClass(
+      'is-hidden-card',
+    );
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    expect(view.queryByRole('heading', { name: 'Top protocols' })).not.toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Show Top protocols' }));
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
   });
 
   it('packs metric columns and marks primary text columns', async () => {

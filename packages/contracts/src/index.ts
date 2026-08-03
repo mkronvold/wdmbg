@@ -136,6 +136,10 @@ export const dashboardSchema = z.object({
   generatedAt: z.string().datetime(),
   topTalkers: z.array(talkerRowSchema),
   topReceivers: z.array(talkerRowSchema),
+  /** LAN hosts only (`isLocalAddress`), ranked by TX after the same flow filter. */
+  topLocalTalkers: z.array(talkerRowSchema),
+  /** LAN hosts only (`isLocalAddress`), ranked by RX after the same flow filter. */
+  topLocalReceivers: z.array(talkerRowSchema),
   topProtocols: z.array(protocolRowSchema),
   hotFlows: z.array(flowRowSchema),
   topCountries: z.array(countryRowSchema),

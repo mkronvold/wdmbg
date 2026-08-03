@@ -5,6 +5,8 @@ import {
   buildTrafficSummary,
   hostFlows,
   hostSummary,
+  topLocalReceivers,
+  topLocalTalkers,
   topReceivers,
   topTalkers,
 } from './aggregate.js';
@@ -125,6 +127,50 @@ describe('aggregation', () => {
     expect(filtered.hotFlows.some((f) => f.src === '10.0.0.20' && f.dst === '10.0.0.10')).toBe(
       false,
     );
+  });
+
+  it('ranks only LAN hosts in top local talkers/receivers', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    seed(store, now);
+    const flows = store.aggregateFlows('5s', now);
+    const localTalkers = topLocalTalkers(flows);
+    const localReceivers = topLocalReceivers(flows);
+
+    expect(localTalkers.every((r) => r.host.startsWith('10.'))).toBe(true);
+    expect(localReceivers.every((r) => r.host.startsWith('10.'))).toBe(true);
+    expect(localTalkers.some((r) => r.host === '1.1.1.1')).toBe(false);
+    expect(localReceivers.some((r) => r.host === '1.1.1.1')).toBe(false);
+
+    // 10.0.0.10 tx = 1000 (to remote) + 50 (reply to LAN peer) = 1050
+    expect(localTalkers[0]?.host).toBe('10.0.0.10');
+    expect(localTalkers[0]?.txBytes).toBe(1050);
+    // 10.0.0.10 rx = 9000 + 200 = 9200
+    expect(localReceivers[0]?.host).toBe('10.0.0.10');
+    expect(localReceivers[0]?.rxBytes).toBe(9200);
+  });
+
+  it('excludeLocal drops LAN↔LAN contribution from local host totals', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    seed(store, now);
+    const withLocal = buildDashboard(store, '5s', now);
+    const withoutLocal = buildDashboard(store, '5s', now, undefined, { excludeLocal: true });
+
+    expect(withLocal.topLocalTalkers.every((r) => !r.host.includes('1.1.1.1'))).toBe(true);
+    expect(withoutLocal.topLocalTalkers.every((r) => !r.host.includes('1.1.1.1'))).toBe(true);
+    expect(withoutLocal.topLocalReceivers.every((r) => !r.host.includes('1.1.1.1'))).toBe(true);
+
+    const laptopShown = withLocal.topLocalTalkers.find((r) => r.host === '10.0.0.10');
+    const laptopHidden = withoutLocal.topLocalTalkers.find((r) => r.host === '10.0.0.10');
+    expect(laptopShown?.txBytes).toBe(1050);
+    // LAN↔LAN (50 tx reply side from 10.0.0.10 as dst) dropped
+    expect(laptopHidden?.txBytes).toBe(1000);
+    expect(laptopHidden?.rxBytes).toBe(9000);
+
+    // Peer that only appears on LAN↔LAN is gone when local traffic hidden
+    expect(withLocal.topLocalTalkers.some((r) => r.host === '10.0.0.20')).toBe(true);
+    expect(withoutLocal.topLocalTalkers.some((r) => r.host === '10.0.0.20')).toBe(false);
   });
 
   it('splits local vs internet byte buckets (independent of excludeLocal)', () => {

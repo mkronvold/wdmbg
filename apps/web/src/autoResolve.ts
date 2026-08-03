@@ -66,6 +66,12 @@ export function collectUnnamedFromDashboard(data: Dashboard): string[] {
   for (const row of data.topReceivers as TalkerRow[]) {
     consider(row.host, row.label, out);
   }
+  for (const row of data.topLocalTalkers as TalkerRow[]) {
+    consider(row.host, row.label, out);
+  }
+  for (const row of data.topLocalReceivers as TalkerRow[]) {
+    consider(row.host, row.label, out);
+  }
   for (const row of data.hotFlows as FlowRow[]) {
     consider(row.src, row.srcLabel, out);
     consider(row.dst, row.dstLabel, out);

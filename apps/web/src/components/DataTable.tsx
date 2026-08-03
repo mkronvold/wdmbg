@@ -45,6 +45,11 @@ export interface DataTableProps<T> {
   /** Stable id for drag/drop reorder. */
   cardId?: string;
   draggable?: boolean;
+  /** Layout edit mode: show drag handle + hide toggle; omit copy. */
+  editMode?: boolean;
+  /** Card is user-hidden (still visible in edit mode, dulled). */
+  hidden?: boolean;
+  onToggleHidden?: () => void;
   isDragging?: boolean;
   isDragOver?: boolean;
   onDragStart?: (event: DragEvent<HTMLElement>, cardId: string) => void;
@@ -69,6 +74,9 @@ export function DataTable<T>({
   legend,
   cardId,
   draggable = false,
+  editMode = false,
+  hidden = false,
+  onToggleHidden,
   isDragging = false,
   isDragOver = false,
   onDragStart,
@@ -98,11 +106,14 @@ export function DataTable<T>({
   const csv = rowsToCsv(headers, stringRows);
   const rich = rowsToRich(headers, stringRows);
 
+  const canDrag = Boolean(editMode && draggable && cardId);
+
   const panelClass = [
     'panel',
     'table-panel',
     isDragging ? 'is-dragging' : '',
     isDragOver ? 'is-drag-over' : '',
+    editMode && hidden ? 'is-hidden-card' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -121,19 +132,19 @@ export function DataTable<T>({
       className={panelClass}
       data-card-id={cardId}
       onDragOver={
-        draggable && cardId
+        canDrag
           ? (e) => {
               e.preventDefault();
-              onDragOver?.(e, cardId);
+              onDragOver?.(e, cardId!);
             }
           : undefined
       }
-      onDragLeave={draggable && cardId ? (e) => onDragLeave?.(e, cardId) : undefined}
+      onDragLeave={canDrag ? (e) => onDragLeave?.(e, cardId!) : undefined}
       onDrop={
-        draggable && cardId
+        canDrag
           ? (e) => {
               e.preventDefault();
-              onDrop?.(e, cardId);
+              onDrop?.(e, cardId!);
             }
           : undefined
       }
@@ -141,13 +152,13 @@ export function DataTable<T>({
       <div className="panel-head">
         <div className="panel-title-block">
           <div className="panel-title-row">
-            {draggable && cardId && (
+            {canDrag && (
               <span
                 className="drag-handle"
                 title="Drag to reorder"
                 aria-label={`Drag to reorder ${title}`}
                 draggable
-                onDragStart={(e) => onDragStart?.(e, cardId)}
+                onDragStart={(e) => onDragStart?.(e, cardId!)}
                 onDragEnd={onDragEnd}
               >
                 ⋮⋮
@@ -157,7 +168,20 @@ export function DataTable<T>({
           </div>
           {legendText ? <p className="panel-legend">{legendText}</p> : null}
         </div>
-        <CopyButton richText={rich} csvText={csv} />
+        {editMode ? (
+          <button
+            type="button"
+            className={`hide-card-btn icon-btn${hidden ? ' is-hidden' : ''}`}
+            title={hidden ? `Show ${title}` : `Hide ${title}`}
+            aria-label={hidden ? `Show ${title}` : `Hide ${title}`}
+            aria-pressed={hidden}
+            onClick={onToggleHidden}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        ) : (
+          <CopyButton richText={rich} csvText={csv} />
+        )}
       </div>
       {sortedRows.length === 0 ? (
         <p className="muted">{empty}</p>
