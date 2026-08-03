@@ -40,7 +40,7 @@ Optional. When unset or unreachable, the chain skips silently to PTR.
 | `WDMBG_ADGUARD_ENABLED` | Optional; default **on** when URL is set. Set `0` to disable without removing URL |
 | `WDMBG_ADGUARD_TIMEOUT_MS` | Per-request timeout (default `1500`) |
 | `WDMBG_ADGUARD_REFRESH_MS` | Background map refresh interval (default `300000` = 5m) |
-| `WDMBG_ADGUARD_CACHE_TTL_MS` | `lookup_cache` TTL for AdGuard hits (default `600000` = 10m) |
+| `WDMBG_ADGUARD_CACHE_TTL_MS` | `lookup_cache` TTL for AdGuard hits (default `43200000` = 12h) |
 
 API surface used (read-only):
 

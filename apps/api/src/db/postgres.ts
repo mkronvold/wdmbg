@@ -61,7 +61,7 @@ export class PostgresMetaStore implements MetaStore {
     },
   ) {
     this.cacheTtlMs = opts?.cacheTtlMs ?? 60 * 60 * 1000;
-    this.adguardCacheTtlMs = opts?.adguardCacheTtlMs ?? 10 * 60 * 1000;
+    this.adguardCacheTtlMs = opts?.adguardCacheTtlMs ?? 12 * 60 * 60 * 1000;
     this.ptrEnabled = opts?.ptrEnabled ?? true;
     this.adguard = opts?.adguard ?? null;
   }
