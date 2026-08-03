@@ -22,23 +22,41 @@ async function getJson<T>(url: string, parse: (data: unknown) => T): Promise<T> 
   return parse(await response.json());
 }
 
+function withExcludeLocal(url: string, excludeLocal?: boolean): string {
+  if (!excludeLocal) return url;
+  const join = url.includes('?') ? '&' : '?';
+  return `${url}${join}excludeLocal=1`;
+}
+
 export function fetchHealth(): Promise<Health> {
   return getJson('/api/health', (d) => healthSchema.parse(d));
 }
 
-export function fetchDashboard(window: QueryWindow): Promise<Dashboard> {
-  return getJson(`/api/dashboard?window=${window}`, (d) => dashboardSchema.parse(d));
-}
-
-export function fetchHost(host: string, window: QueryWindow): Promise<HostSummary> {
-  return getJson(`/api/hosts/${encodeURIComponent(host)}?window=${window}`, (d) =>
-    hostSummarySchema.parse(d),
+export function fetchDashboard(window: QueryWindow, excludeLocal = false): Promise<Dashboard> {
+  return getJson(withExcludeLocal(`/api/dashboard?window=${window}`, excludeLocal), (d) =>
+    dashboardSchema.parse(d),
   );
 }
 
-export function fetchHostFlows(host: string, window: QueryWindow): Promise<HostFlows> {
-  return getJson(`/api/hosts/${encodeURIComponent(host)}/flows?window=${window}`, (d) =>
-    hostFlowsSchema.parse(d),
+export function fetchHost(
+  host: string,
+  window: QueryWindow,
+  excludeLocal = false,
+): Promise<HostSummary> {
+  return getJson(
+    withExcludeLocal(`/api/hosts/${encodeURIComponent(host)}?window=${window}`, excludeLocal),
+    (d) => hostSummarySchema.parse(d),
+  );
+}
+
+export function fetchHostFlows(
+  host: string,
+  window: QueryWindow,
+  excludeLocal = false,
+): Promise<HostFlows> {
+  return getJson(
+    withExcludeLocal(`/api/hosts/${encodeURIComponent(host)}/flows?window=${window}`, excludeLocal),
+    (d) => hostFlowsSchema.parse(d),
   );
 }
 
@@ -52,6 +70,16 @@ export async function putAlias(host: string, alias: string): Promise<Alias> {
     throw new Error(`alias failed: ${response.status}`);
   }
   return aliasSchema.parse(await response.json());
+}
+
+export async function clearAlias(host: string): Promise<{ ok: boolean; host: string }> {
+  const response = await fetch(`/api/alias?host=${encodeURIComponent(host)}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error(`clear alias failed: ${response.status}`);
+  }
+  return (await response.json()) as { ok: boolean; host: string };
 }
 
 export async function resolveHosts(hosts: string[]): Promise<ResolveResponse> {

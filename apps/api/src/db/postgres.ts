@@ -117,6 +117,19 @@ export class PostgresMetaStore implements MetaStore {
     };
   }
 
+  async clearAlias(host: string): Promise<boolean> {
+    const result = await this.pool.query(`DELETE FROM aliases WHERE host = $1`, [host]);
+    const existed = this.memAlias.delete(host);
+    return (result.rowCount ?? 0) > 0 || existed;
+  }
+
+  async clearCache(host: string): Promise<boolean> {
+    const result = await this.pool.query(`DELETE FROM lookup_cache WHERE host = $1`, [host]);
+    this.memCountry.delete(host);
+    const hadHost = this.memHostname.delete(host);
+    return (result.rowCount ?? 0) > 0 || hadHost;
+  }
+
   listAliases(): Alias[] {
     return [...this.memAlias.entries()].map(([host, alias]) => ({
       host,

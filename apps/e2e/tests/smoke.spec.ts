@@ -27,9 +27,16 @@ test.describe('WDMBG live smoke', () => {
   test('API health responds ok', async ({ request }) => {
     const res = await getHealth(request);
     expect(res.ok(), `health status ${res.status()}`).toBeTruthy();
-    const body = (await res.json()) as { status?: string; service?: string };
+    const body = (await res.json()) as {
+      status?: string;
+      service?: string;
+      geoip?: { configured?: boolean; present?: boolean };
+    };
     expect(body.status).toBe('ok');
     expect(body.service).toBeTruthy();
+    expect(body.geoip).toBeTruthy();
+    expect(typeof body.geoip?.configured).toBe('boolean');
+    expect(typeof body.geoip?.present).toBe('boolean');
   });
 
   test('dashboard loads with key landmarks', async ({ page }) => {
@@ -38,6 +45,9 @@ test.describe('WDMBG live smoke', () => {
     await expect(page.getByRole('heading', { name: 'WDMBG', level: 1 })).toBeVisible();
     await expect(page.getByText('Where did my bandwidth go?')).toBeVisible();
     await expect(page.getByText('Passive traffic monitor')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Display Refresh' })).toBeVisible();
+    await expect(page.getByText('Local Traffic', { exact: true })).toBeVisible();
+    await expect(page.locator('.app-footer .sha-link')).toBeVisible();
   });
 
   test('window toggle and host tables render without crash', async ({ page }) => {
@@ -63,10 +73,8 @@ test.describe('WDMBG live smoke', () => {
     await expect(page.getByRole('heading', { name: 'Top receivers', level: 2 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Top protocols', level: 2 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Hot flows', level: 2 })).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Top traffic by country', level: 2 }),
-    ).toBeVisible();
 
+    // Country card only when MMDB present — either way, no crash.
     // Card legends use "last …" lookback wording (MB/Mbps units).
     await expect(page.getByText(/last 5s/).first()).toBeVisible();
     await expect(page.getByText(/MB/).first()).toBeVisible();

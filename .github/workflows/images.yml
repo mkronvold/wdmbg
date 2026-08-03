@@ -66,6 +66,8 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          build-args: |
+            VITE_GIT_SHA=${{ github.sha }}
           tags: |
             ${{ matrix.image }}:main
             ${{ matrix.image }}:${{ github.sha }}

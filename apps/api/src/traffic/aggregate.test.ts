@@ -102,6 +102,24 @@ describe('aggregation', () => {
     expect(https?.rxBytes).toBe(9000);
   });
 
+  it('attaches flow labels and can exclude local pairs', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    seed(store, now);
+    const labels = {
+      getLabel: (host: string) => (host === '10.0.0.10' ? 'laptop' : undefined),
+      getCountry: (host: string) => (host.startsWith('10.') ? 'Local' : 'Unknown'),
+    };
+    const dash = buildDashboard(store, '30s', now, labels);
+    const https = dash.hotFlows.find((f) => f.dst === '1.1.1.1');
+    expect(https?.srcLabel).toBe('laptop');
+    const filtered = buildDashboard(store, '30s', now, labels, { excludeLocal: true });
+    expect(filtered.hotFlows.every((f) => f.dst === '1.1.1.1' || f.src === '1.1.1.1')).toBe(true);
+    expect(filtered.hotFlows.some((f) => f.src === '10.0.0.20' && f.dst === '10.0.0.10')).toBe(
+      false,
+    );
+  });
+
   it('returns host-relative flows', () => {
     const store = new TrafficStore();
     const now = 1_800_000_000;

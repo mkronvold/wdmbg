@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import type { CountryRow, FlowRow, ProtocolRow, QueryWindow, TalkerRow } from '@wdmbg/contracts';
 import { WINDOW_SECONDS } from '@wdmbg/contracts';
-import { useCallback, useEffect, useState, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import { fetchDashboard, fetchHealth, liveWsUrl } from './api/client';
 import { DataTable } from './components/DataTable';
-import { formatBytes, formatMb, formatMbps, windowLegend } from './components/format';
+import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
 import {
   THEME_IDS,
@@ -18,6 +18,8 @@ import {
 const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
 const CARD_ORDER_KEY = 'wdmbg.dashboard.cardOrder';
+const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
+const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 
 const DEFAULT_CARD_ORDER = [
   'topTalkers',
@@ -28,6 +30,18 @@ const DEFAULT_CARD_ORDER = [
 ] as const;
 
 type CardId = (typeof DEFAULT_CARD_ORDER)[number];
+
+const DISPLAY_REFRESH_OPTIONS = [
+  { id: 'pause', label: 'Pause', ms: null as number | null },
+  { id: '1s', label: '1s', ms: 1_000 },
+  { id: '5s', label: '5s', ms: 5_000 },
+  { id: '30s', label: '30s', ms: 30_000 },
+  { id: '1m', label: '1m', ms: 60_000 },
+  { id: '5m', label: '5m', ms: 300_000 },
+  { id: '15m', label: '15m', ms: 900_000 },
+] as const;
+
+type DisplayRefreshId = (typeof DISPLAY_REFRESH_OPTIONS)[number]['id'];
 
 function loadCardOrder(): CardId[] {
   try {
@@ -61,21 +75,132 @@ function saveCardOrder(order: CardId[]) {
   }
 }
 
+function loadDisplayRefresh(): DisplayRefreshId {
+  try {
+    const raw = localStorage.getItem(DISPLAY_REFRESH_KEY);
+    if (raw && DISPLAY_REFRESH_OPTIONS.some((o) => o.id === raw)) {
+      return raw as DisplayRefreshId;
+    }
+  } catch {
+    // ignore
+  }
+  return '5s';
+}
+
+function saveDisplayRefresh(id: DisplayRefreshId) {
+  try {
+    localStorage.setItem(DISPLAY_REFRESH_KEY, id);
+  } catch {
+    // ignore
+  }
+}
+
+function loadLocalTrafficShown(): boolean {
+  try {
+    const raw = localStorage.getItem(LOCAL_TRAFFIC_KEY);
+    if (raw === 'hidden') return false;
+    if (raw === 'shown') return true;
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+function saveLocalTrafficShown(shown: boolean) {
+  try {
+    localStorage.setItem(LOCAL_TRAFFIC_KEY, shown ? 'shown' : 'hidden');
+  } catch {
+    // ignore
+  }
+}
+
+function readIpParam(): string | null {
+  try {
+    const ip = new URLSearchParams(globalThis.location.search).get('ip');
+    return ip && ip.trim() ? ip.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function setIpParam(ip: string | null) {
+  try {
+    const url = new URL(globalThis.location.href);
+    if (ip) {
+      url.searchParams.set('ip', ip);
+    } else {
+      url.searchParams.delete('ip');
+    }
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    if (
+      next !==
+      `${globalThis.location.pathname}${globalThis.location.search}${globalThis.location.hash}`
+    ) {
+      globalThis.history.pushState({ ip }, '', next);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function gitShaLabel(): { short: string; href: string | null } {
+  const raw = (import.meta.env.VITE_GIT_SHA as string | undefined)?.trim() || 'dev';
+  const short =
+    raw === 'dev' || raw.startsWith('sha-') ? raw.replace(/^sha-/, '') : raw.slice(0, 7);
+  const display = short.startsWith('sha-') ? short : `sha-${short}`;
+  if (!raw || raw === 'dev' || raw === 'sha-dev') {
+    return { short: 'sha-dev', href: null };
+  }
+  const full = raw.replace(/^sha-/, '');
+  return {
+    short: display,
+    href: `https://github.com/mkronvold/wdmbg/commit/${full}`,
+  };
+}
+
 export function App() {
   const [window, setWindow] = useState<QueryWindow>('30s');
-  const [selectedHost, setSelectedHost] = useState<string | null>(null);
+  const [selectedHost, setSelectedHost] = useState<string | null>(() => readIpParam());
   const [live, setLive] = useState<{ t: number; totalBytes: number; flowCount: number } | null>(
     null,
   );
   const [cardOrder, setCardOrder] = useState<CardId[]>(() => loadCardOrder());
   const [draggingId, setDraggingId] = useState<CardId | null>(null);
   const [dragOverId, setDragOverId] = useState<CardId | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [displayRefresh, setDisplayRefresh] = useState<DisplayRefreshId>(() =>
+    loadDisplayRefresh(),
+  );
+  const [localTrafficShown, setLocalTrafficShown] = useState<boolean>(() =>
+    loadLocalTrafficShown(),
+  );
   const [theme, setTheme] = useState<ThemeId>(() => resolveInitialTheme());
+  const sha = useMemo(() => gitShaLabel(), []);
+
+  const refreshOpt =
+    DISPLAY_REFRESH_OPTIONS.find((o) => o.id === displayRefresh) ?? DISPLAY_REFRESH_OPTIONS[2];
+  const paused = refreshOpt.ms === null;
+  const refetchInterval = refreshOpt.ms === null ? false : refreshOpt.ms;
+  const excludeLocal = !localTrafficShown;
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    const onPop = () => setSelectedHost(readIpParam());
+    globalThis.addEventListener('popstate', onPop);
+    return () => globalThis.removeEventListener('popstate', onPop);
+  }, []);
+
+  const selectHost = useCallback((host: string) => {
+    setSelectedHost(host);
+    setIpParam(host);
+  }, []);
+
+  const closeHost = useCallback(() => {
+    setSelectedHost(null);
+    setIpParam(null);
+  }, []);
 
   const health = useQuery({
     queryKey: ['health'],
@@ -85,9 +210,9 @@ export function App() {
   });
 
   const dashboard = useQuery({
-    queryKey: ['dashboard', window],
-    queryFn: () => fetchDashboard(window),
-    refetchInterval: paused ? false : 2_000,
+    queryKey: ['dashboard', window, excludeLocal],
+    queryFn: () => fetchDashboard(window, excludeLocal),
+    refetchInterval,
   });
 
   useEffect(() => {
@@ -133,18 +258,28 @@ export function App() {
     };
   }, [paused]);
 
-  const selectHost = useCallback((host: string) => {
-    setSelectedHost(host);
-  }, []);
-
   const onThemeChange = useCallback((next: ThemeId) => {
     persistTheme(next);
     applyTheme(next);
     setTheme(next);
   }, []);
 
+  const onDisplayRefreshChange = useCallback((id: DisplayRefreshId) => {
+    setDisplayRefresh(id);
+    saveDisplayRefresh(id);
+  }, []);
+
+  const onLocalTrafficToggle = useCallback(() => {
+    setLocalTrafficShown((prev) => {
+      const next = !prev;
+      saveLocalTrafficShown(next);
+      return next;
+    });
+  }, []);
+
   const secs = WINDOW_SECONDS[window];
   const legend = windowLegend(window);
+  const geoipPresent = health.data?.geoip?.present === true;
 
   const onDragStart = useCallback((event: DragEvent<HTMLElement>, cardId: string) => {
     event.dataTransfer.effectAllowed = 'move';
@@ -214,6 +349,7 @@ export function App() {
             header: 'Host',
             cellClassName: 'cell-host',
             render: (r: TalkerRow) => r.label ?? r.host,
+            sortValue: (r: TalkerRow) => r.label ?? r.host,
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
           {
@@ -221,24 +357,28 @@ export function App() {
             header: 'TX MB',
             numeric: true,
             render: (r: TalkerRow) => formatMb(r.txBytes),
+            sortValue: (r: TalkerRow) => r.txBytes,
           },
           {
             key: 'rx',
             header: 'RX MB',
             numeric: true,
             render: (r: TalkerRow) => formatMb(r.rxBytes),
+            sortValue: (r: TalkerRow) => r.rxBytes,
           },
           {
             key: 'txr',
             header: 'TX Mbps',
             numeric: true,
             render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
+            sortValue: (r: TalkerRow) => r.txBytes,
           },
           {
             key: 'rxr',
             header: 'RX Mbps',
             numeric: true,
             render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: TalkerRow) => r.rxBytes,
           },
           { key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' },
         ]}
@@ -260,6 +400,7 @@ export function App() {
             header: 'Host',
             cellClassName: 'cell-host',
             render: (r: TalkerRow) => r.label ?? r.host,
+            sortValue: (r: TalkerRow) => r.label ?? r.host,
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
           {
@@ -267,24 +408,28 @@ export function App() {
             header: 'RX MB',
             numeric: true,
             render: (r: TalkerRow) => formatMb(r.rxBytes),
+            sortValue: (r: TalkerRow) => r.rxBytes,
           },
           {
             key: 'tx',
             header: 'TX MB',
             numeric: true,
             render: (r: TalkerRow) => formatMb(r.txBytes),
+            sortValue: (r: TalkerRow) => r.txBytes,
           },
           {
             key: 'rxr',
             header: 'RX Mbps',
             numeric: true,
             render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: TalkerRow) => r.rxBytes,
           },
           {
             key: 'txr',
             header: 'TX Mbps',
             numeric: true,
             render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
+            sortValue: (r: TalkerRow) => r.txBytes,
           },
           { key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' },
         ]}
@@ -302,8 +447,20 @@ export function App() {
         {...dragProps}
         columns={[
           { key: 'p', header: 'Protocol', render: (r: ProtocolRow) => r.protocol },
-          { key: 'b', header: 'MB', numeric: true, render: (r: ProtocolRow) => formatMb(r.bytes) },
-          { key: 'pk', header: 'Packets', numeric: true, render: (r: ProtocolRow) => r.packets },
+          {
+            key: 'b',
+            header: 'MB',
+            numeric: true,
+            render: (r: ProtocolRow) => formatMb(r.bytes),
+            sortValue: (r: ProtocolRow) => r.bytes,
+          },
+          {
+            key: 'pk',
+            header: 'Packets',
+            numeric: true,
+            render: (r: ProtocolRow) => r.packets,
+            sortValue: (r: ProtocolRow) => r.packets,
+          },
         ]}
       />
     ) : null,
@@ -322,53 +479,84 @@ export function App() {
             key: 'src',
             header: 'Src',
             cellClassName: 'cell-host',
-            render: (r: FlowRow) => r.src,
+            render: (r: FlowRow) => hostLabel(r.src, r.srcLabel),
+            sortValue: (r: FlowRow) => r.srcLabel ?? r.src,
             onCellClick: (r: FlowRow) => selectHost(r.src),
           },
-          { key: 'sp', header: 'SPort', numeric: true, render: (r: FlowRow) => r.srcPort },
+          {
+            key: 'sp',
+            header: 'SPort',
+            numeric: true,
+            render: (r: FlowRow) => r.srcPort,
+            sortValue: (r: FlowRow) => r.srcPort,
+          },
           {
             key: 'dst',
             header: 'Dst',
             cellClassName: 'cell-host',
-            render: (r: FlowRow) => r.dst,
+            render: (r: FlowRow) => hostLabel(r.dst, r.dstLabel),
+            sortValue: (r: FlowRow) => r.dstLabel ?? r.dst,
             onCellClick: (r: FlowRow) => selectHost(r.dst),
           },
-          { key: 'dp', header: 'DPort', numeric: true, render: (r: FlowRow) => r.dstPort },
+          {
+            key: 'dp',
+            header: 'DPort',
+            numeric: true,
+            render: (r: FlowRow) => r.dstPort,
+            sortValue: (r: FlowRow) => r.dstPort,
+          },
           { key: 'l4', header: 'L4', render: (r: FlowRow) => r.l4 },
           { key: 'l7', header: 'L7', render: (r: FlowRow) => r.l7 ?? '—' },
-          { key: 'b', header: 'MB', numeric: true, render: (r: FlowRow) => formatMb(r.bytes) },
+          {
+            key: 'b',
+            header: 'MB',
+            numeric: true,
+            render: (r: FlowRow) => formatMb(r.bytes),
+            sortValue: (r: FlowRow) => r.bytes,
+          },
           {
             key: 'txr',
             header: 'TX Mbps',
             numeric: true,
             render: (r: FlowRow) => formatMbps(r.txBytes ?? 0, secs),
+            sortValue: (r: FlowRow) => r.txBytes ?? 0,
           },
           {
             key: 'rxr',
             header: 'RX Mbps',
             numeric: true,
             render: (r: FlowRow) => formatMbps(r.rxBytes ?? 0, secs),
+            sortValue: (r: FlowRow) => r.rxBytes ?? 0,
           },
         ]}
       />
     ) : null,
-    topCountries: dashboard.data ? (
-      <DataTable
-        key="topCountries"
-        cardId="topCountries"
-        title="Top traffic by country"
-        legend={legend}
-        rows={dashboard.data.topCountries}
-        isDragging={draggingId === 'topCountries'}
-        isDragOver={dragOverId === 'topCountries'}
-        {...dragProps}
-        columns={[
-          { key: 'c', header: 'Country', render: (r: CountryRow) => r.country },
-          { key: 'b', header: 'MB', numeric: true, render: (r: CountryRow) => formatMb(r.bytes) },
-        ]}
-      />
-    ) : null,
+    topCountries:
+      dashboard.data && geoipPresent ? (
+        <DataTable
+          key="topCountries"
+          cardId="topCountries"
+          title="Top traffic by country"
+          legend={legend}
+          rows={dashboard.data.topCountries}
+          isDragging={draggingId === 'topCountries'}
+          isDragOver={dragOverId === 'topCountries'}
+          {...dragProps}
+          columns={[
+            { key: 'c', header: 'Country', render: (r: CountryRow) => r.country },
+            {
+              key: 'b',
+              header: 'MB',
+              numeric: true,
+              render: (r: CountryRow) => formatMb(r.bytes),
+              sortValue: (r: CountryRow) => r.bytes,
+            },
+          ]}
+        />
+      ) : null,
   };
+
+  const visibleCards = cardOrder.filter((id) => id !== 'topCountries' || geoipPresent);
 
   return (
     <div className="app wide">
@@ -398,15 +586,37 @@ export function App() {
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              className="copy-btn icon-btn"
-              onClick={() => setPaused((p) => !p)}
-              aria-label={paused ? 'Resume updates' : 'Pause updates'}
-              title={paused ? 'Resume updates' : 'Pause updates'}
-            >
-              {paused ? '▶' : '⏸'}
-            </button>
+            <div className="window-control">
+              <label className="window-label" htmlFor="display-refresh-select">
+                Display Refresh
+              </label>
+              <select
+                id="display-refresh-select"
+                className="theme-select"
+                value={displayRefresh}
+                aria-label="Display Refresh"
+                onChange={(event) => onDisplayRefreshChange(event.target.value as DisplayRefreshId)}
+              >
+                {DISPLAY_REFRESH_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="window-control">
+              <p className="window-label">Local Traffic</p>
+              <button
+                type="button"
+                className={localTrafficShown ? 'primary' : 'copy-btn'}
+                aria-pressed={localTrafficShown}
+                aria-label={localTrafficShown ? 'Local Traffic Shown' : 'Local Traffic Hidden'}
+                title={localTrafficShown ? 'Local Traffic Shown' : 'Local Traffic Hidden'}
+                onClick={onLocalTrafficToggle}
+              >
+                {localTrafficShown ? 'Shown' : 'Hidden'}
+              </button>
+            </div>
             <div className="window-control">
               <p className="window-label" id="traffic-window-label">
                 Traffic window
@@ -450,11 +660,26 @@ export function App() {
         <p className="muted">Dashboard unavailable — start the API or check the /api proxy.</p>
       )}
 
-      {dashboard.data && <div className="grid">{cardOrder.map((id) => cards[id])}</div>}
+      {dashboard.data && <div className="grid">{visibleCards.map((id) => cards[id])}</div>}
 
       {selectedHost && (
-        <HostDialog host={selectedHost} window={window} onClose={() => setSelectedHost(null)} />
+        <HostDialog
+          host={selectedHost}
+          window={window}
+          excludeLocal={excludeLocal}
+          onClose={closeHost}
+        />
       )}
+
+      <footer className="app-footer">
+        {sha.href ? (
+          <a className="sha-link" href={sha.href} target="_blank" rel="noreferrer">
+            {sha.short}
+          </a>
+        ) : (
+          <span className="sha-link muted">{sha.short}</span>
+        )}
+      </footer>
     </div>
   );
 }

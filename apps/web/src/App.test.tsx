@@ -16,7 +16,12 @@ vi.stubGlobal(
 );
 
 vi.mock('./api/client', () => ({
-  fetchHealth: vi.fn(async () => ({ status: 'ok', service: 'wdmbg-api', version: '0.0.0' })),
+  fetchHealth: vi.fn(async () => ({
+    status: 'ok',
+    service: 'wdmbg-api',
+    version: '0.0.0',
+    geoip: { configured: false, present: false },
+  })),
   liveWsUrl: vi.fn(() => 'ws://localhost/live'),
   fetchDashboard: vi.fn(async () => ({
     window: '30s',
@@ -45,6 +50,7 @@ vi.mock('./api/client', () => ({
         packets: 12,
         txBytes: 1000,
         rxBytes: 9000,
+        srcLabel: 'laptop',
       },
     ],
     topCountries: [{ country: 'Unknown', bytes: 9_000_000 }],
@@ -68,6 +74,7 @@ vi.mock('./api/client', () => ({
     flows: [],
   })),
   putAlias: vi.fn(),
+  clearAlias: vi.fn(),
   resolveHosts: vi.fn(),
 }));
 
@@ -109,8 +116,15 @@ describe('App', () => {
         dispatchEvent: vi.fn(),
       })),
     );
+    window.history.replaceState({}, '', '/');
     document.documentElement.removeAttribute('data-theme');
     vi.mocked(client.fetchDashboard).mockClear();
+    vi.mocked(client.fetchHealth).mockImplementation(async () => ({
+      status: 'ok',
+      service: 'wdmbg-api',
+      version: '0.0.0',
+      geoip: { configured: false, present: false },
+    }));
   });
 
   afterEach(() => {
@@ -131,34 +145,35 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     expect(view.getAllByText(/last 30s/).length).toBeGreaterThan(0);
-    expect(view.getAllByRole('columnheader', { name: 'TX Mbps' }).length).toBeGreaterThan(0);
-    expect(view.getAllByRole('columnheader', { name: 'TX MB' }).length).toBeGreaterThan(0);
+    expect(view.getAllByRole('columnheader', { name: /TX Mbps/ }).length).toBeGreaterThan(0);
+    expect(view.getAllByRole('columnheader', { name: /TX MB/ }).length).toBeGreaterThan(0);
     expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
     expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
+    expect(view.getByText('sha-dev')).toBeInTheDocument();
   });
 
-  it('opens host details from hot flow Src/Dst IPs', async () => {
+  it('opens host details from hot flow Src/Dst IPs and deep-links', async () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
     });
 
-    // Dst IP on Hot flows
     fireEvent.click(view.getByRole('button', { name: '1.1.1.1' }));
     expect(await view.findByRole('dialog', { name: /Host 1\.1\.1\.1/i })).toBeInTheDocument();
+    expect(window.location.search).toContain('ip=1.1.1.1');
     fireEvent.click(view.getByRole('button', { name: 'Close' }));
     await waitFor(() => {
       expect(view.queryByRole('dialog')).not.toBeInTheDocument();
     });
+    expect(window.location.search).not.toContain('ip=');
 
-    // Src IP on Hot flows (same address may also appear as talker host label)
-    const srcButtons = view.getAllByRole('button', { name: '10.0.0.10' });
+    const srcButtons = view.getAllByRole('button', { name: /10\.0\.0\.10/ });
     expect(srcButtons.length).toBeGreaterThan(0);
     fireEvent.click(srcButtons[srcButtons.length - 1]!);
     expect(await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i })).toBeInTheDocument();
 
-    // Talker host label still opens the same HostDialog
     fireEvent.click(view.getByRole('button', { name: 'Close' }));
     await waitFor(() => {
       expect(view.queryByRole('dialog')).not.toBeInTheDocument();
@@ -209,7 +224,7 @@ describe('App', () => {
     );
   });
 
-  it('pauses dashboard refetching and shows paused state', async () => {
+  it('pauses dashboard refetching via Display Refresh and shows paused state', async () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
@@ -219,16 +234,46 @@ describe('App', () => {
     const callsAfterMount = vi.mocked(client.fetchDashboard).mock.calls.length;
     expect(callsAfterMount).toBeGreaterThan(0);
 
-    fireEvent.click(view.getByRole('button', { name: 'Pause updates' }));
+    const refresh = view.getByRole('combobox', { name: 'Display Refresh' });
+    fireEvent.change(refresh, { target: { value: 'pause' } });
     expect(view.getByText('Paused')).toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Resume updates' })).toBeInTheDocument();
+    expect(localStorage.getItem('wdmbg.displayRefresh')).toBe('pause');
 
-    // Live interval is 2s; wait past a few ticks with real timers while paused.
     await new Promise((resolve) => setTimeout(resolve, 2500));
     expect(vi.mocked(client.fetchDashboard).mock.calls.length).toBe(callsAfterMount);
 
-    fireEvent.click(view.getByRole('button', { name: 'Resume updates' }));
+    fireEvent.change(refresh, { target: { value: '5s' } });
     expect(view.queryByText('Paused')).not.toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Pause updates' })).toBeInTheDocument();
+    expect(localStorage.getItem('wdmbg.displayRefresh')).toBe('5s');
+  });
+
+  it('toggles Local Traffic and requests excludeLocal', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    const toggle = view.getByRole('button', { name: 'Local Traffic Shown' });
+    fireEvent.click(toggle);
+    expect(view.getByRole('button', { name: 'Local Traffic Hidden' })).toBeInTheDocument();
+    expect(localStorage.getItem('wdmbg.localTraffic')).toBe('hidden');
+    await waitFor(() => {
+      expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[1] === true)).toBe(true);
+    });
+  });
+
+  it('shows Top traffic by country only when geoip present', async () => {
+    vi.mocked(client.fetchHealth).mockResolvedValue({
+      status: 'ok',
+      service: 'wdmbg-api',
+      version: '0.0.0',
+      geoip: { configured: true, present: true },
+    });
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top traffic by country' })).toBeInTheDocument();
+    });
   });
 });

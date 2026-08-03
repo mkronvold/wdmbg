@@ -23,6 +23,10 @@ export interface LookupCacheEntry {
 export interface MetaStore {
   getAlias(host: string): string | undefined;
   setAlias(host: string, alias: string): Promise<Alias>;
+  /** Remove persistent alias for host (no-op if missing). */
+  clearAlias(host: string): Promise<boolean>;
+  /** Drop lookup_cache entry so resolved names can refresh. */
+  clearCache(host: string): Promise<boolean>;
   listAliases(): Alias[];
   resolve(hosts: string[]): Promise<ResolveResult[]>;
   asLabelLookup(): LabelLookup;
@@ -171,6 +175,14 @@ export class MemoryMetaStore implements MetaStore {
     const row: Alias = { host, alias, updatedAt: nowIso() };
     this.aliases.set(host, row);
     return row;
+  }
+
+  async clearAlias(host: string): Promise<boolean> {
+    return this.aliases.delete(host);
+  }
+
+  async clearCache(host: string): Promise<boolean> {
+    return this.lookupCache.delete(host);
   }
 
   listAliases(): Alias[] {

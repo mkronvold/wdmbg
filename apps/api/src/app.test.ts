@@ -17,13 +17,14 @@ describe('API', () => {
     await app.close();
   });
 
-  it('GET /health returns ok', async () => {
+  it('GET /health returns ok with geoip status', async () => {
     const app = await appPromise;
     const response = await app.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       status: 'ok',
       service: 'wdmbg-api',
+      geoip: { configured: false, present: false },
     });
   });
 
@@ -174,5 +175,86 @@ describe('API', () => {
       hostname: 'nas',
       source: 'alias',
     });
+  });
+
+  it('DELETE alias clears alias and lookup cache', async () => {
+    const app = await appPromise;
+    meta.seedLookup({
+      host: '10.0.0.55',
+      hostname: 'cached.lan',
+      country: 'Local',
+      asn: null,
+      source: 'ptr',
+      expiresAt: Date.now() + 60_000,
+    });
+    await app.inject({
+      method: 'PUT',
+      url: '/api/alias',
+      payload: { host: '10.0.0.55', alias: 'temp' },
+    });
+    const del = await app.inject({
+      method: 'DELETE',
+      url: '/api/alias?host=10.0.0.55',
+    });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toMatchObject({
+      ok: true,
+      host: '10.0.0.55',
+      aliasCleared: true,
+      cacheCleared: true,
+    });
+    expect(meta.getAlias('10.0.0.55')).toBeUndefined();
+    expect(meta.asLabelLookup().getLabel('10.0.0.55')).toBeUndefined();
+  });
+
+  it('GET dashboard excludeLocal drops local↔local pairs', async () => {
+    const app = await appPromise;
+    const now = Math.floor(Date.now() / 1000);
+    await app.inject({
+      method: 'POST',
+      url: '/api/ingest/rollups',
+      payload: {
+        probeId: 'probe-1',
+        sentAt: new Date().toISOString(),
+        buckets: [
+          {
+            t: now,
+            flows: [
+              {
+                src: '10.0.0.10',
+                dst: '10.0.0.20',
+                srcPort: 1,
+                dstPort: 2,
+                l4: 'tcp',
+                bytesSrcToDst: 1000,
+                bytesDstToSrc: 1000,
+                packetsSrcToDst: 1,
+                packetsDstToSrc: 1,
+              },
+              {
+                src: '10.0.0.10',
+                dst: '1.1.1.1',
+                srcPort: 3,
+                dstPort: 443,
+                l4: 'tcp',
+                bytesSrcToDst: 50,
+                bytesDstToSrc: 50,
+                packetsSrcToDst: 1,
+                packetsDstToSrc: 1,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const all = await app.inject({ method: 'GET', url: '/api/dashboard?window=5s' });
+    expect(all.json().hotFlows.length).toBe(2);
+    const filtered = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard?window=5s&excludeLocal=1',
+    });
+    expect(filtered.statusCode).toBe(200);
+    expect(filtered.json().hotFlows).toHaveLength(1);
+    expect(filtered.json().hotFlows[0]?.dst).toBe('1.1.1.1');
   });
 });

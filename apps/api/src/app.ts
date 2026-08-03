@@ -75,23 +75,26 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     });
   });
 
-  app.get('/health', async () => {
-    const payload = {
+  const healthPayload = () => {
+    const geo = geoip.status;
+    return {
       status: 'ok' as const,
       service: `${appName}-api`,
       version: appVersion,
+      geoip: {
+        configured: geo.configured,
+        present: geo.present,
+      },
     };
-    return healthSchema.parse(payload);
+  };
+
+  app.get('/health', async () => {
+    return healthSchema.parse(healthPayload());
   });
 
   // Prefer /api/health via web proxy; keep root /health for local/dev.
   app.get('/api/health', async () => {
-    const payload = {
-      status: 'ok' as const,
-      service: `${appName}-api`,
-      version: appVersion,
-    };
-    return healthSchema.parse(payload);
+    return healthSchema.parse(healthPayload());
   });
 
   app.post('/api/ingest/rollups', async (request, reply) => {
@@ -104,28 +107,36 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     });
   });
 
+  const parseExcludeLocal = (raw: unknown): boolean => {
+    if (typeof raw !== 'string') return false;
+    return raw === '1' || raw.toLowerCase() === 'true' || raw.toLowerCase() === 'yes';
+  };
+
   app.get('/api/dashboard', async (request) => {
-    const query = request.query as { window?: string };
+    const query = request.query as { window?: string; excludeLocal?: string };
     const window = parseWindow(query.window);
-    const payload = buildDashboard(store, window, undefined, labels());
+    const excludeLocal = parseExcludeLocal(query.excludeLocal);
+    const payload = buildDashboard(store, window, undefined, labels(), { excludeLocal });
     return dashboardSchema.parse(payload);
   });
 
   app.get('/api/hosts/:host', async (request) => {
     const params = request.params as { host: string };
-    const query = request.query as { window?: string };
+    const query = request.query as { window?: string; excludeLocal?: string };
     const window = parseWindow(query.window);
+    const excludeLocal = parseExcludeLocal(query.excludeLocal);
     const host = decodeURIComponent(params.host);
-    const payload = hostSummary(store, host, window, undefined, labels());
+    const payload = hostSummary(store, host, window, undefined, labels(), { excludeLocal });
     return hostSummarySchema.parse(payload);
   });
 
   app.get('/api/hosts/:host/flows', async (request) => {
     const params = request.params as { host: string };
-    const query = request.query as { window?: string };
+    const query = request.query as { window?: string; excludeLocal?: string };
     const window = parseWindow(query.window);
+    const excludeLocal = parseExcludeLocal(query.excludeLocal);
     const host = decodeURIComponent(params.host);
-    const payload = hostFlows(store, host, window);
+    const payload = hostFlows(store, host, window, undefined, 50, labels(), { excludeLocal });
     return hostFlowsSchema.parse(payload);
   });
 
@@ -133,6 +144,21 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     const body = aliasPutSchema.parse(request.body);
     const saved = await meta.setAlias(body.host, body.alias);
     return aliasSchema.parse(saved);
+  });
+
+  app.delete('/api/alias', async (request, reply) => {
+    const query = request.query as { host?: string };
+    const host = typeof query.host === 'string' ? query.host.trim() : '';
+    if (!host) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'host query parameter is required',
+      });
+    }
+    const aliasCleared = await meta.clearAlias(host);
+    const cacheCleared = await meta.clearCache(host);
+    return { ok: true, host, aliasCleared, cacheCleared };
   });
 
   app.get('/api/aliases', async () => {
