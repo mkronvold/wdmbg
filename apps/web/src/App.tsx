@@ -17,7 +17,7 @@ import {
   saveResolveNameMode,
   type ResolveNameMode,
 } from './autoResolve';
-import { reorderCards } from './cardOrder';
+import { reorderCards, segmentVisibleCards } from './cardOrder';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
@@ -905,6 +905,8 @@ export function App() {
     return true;
   });
 
+  const boardSegments = segmentVisibleCards(visibleCards, wideSet);
+
   return (
     <div className="app wide">
       <header className="hero">
@@ -1022,7 +1024,21 @@ export function App() {
         <p className="muted">Dashboard unavailable — start the API or check the /api proxy.</p>
       )}
 
-      {dashboard.data && <div className="grid">{visibleCards.map((id) => cards[id])}</div>}
+      {dashboard.data && (
+        <div className="dashboard-boards">
+          {boardSegments.map((segment) =>
+            segment.type === 'grid' ? (
+              <div key={`grid:${segment.ids.join(',')}`} className="grid">
+                {segment.ids.map((id) => cards[id])}
+              </div>
+            ) : (
+              <div key={`wide:${segment.id}`} className="grid-wide">
+                {cards[segment.id]}
+              </div>
+            ),
+          )}
+        </div>
+      )}
 
       {selectedHost && (
         <HostDialog

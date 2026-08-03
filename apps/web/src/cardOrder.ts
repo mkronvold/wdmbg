@@ -17,3 +17,36 @@ export function reorderCards<T extends string>(order: readonly T[], sourceId: T,
   }
   return order as T[];
 }
+
+/** Multicol segment: consecutive non-wide cards share one `.grid`. */
+export type CardSegment<T extends string> = { type: 'grid'; ids: T[] } | { type: 'wide'; id: T };
+
+/**
+ * Split visible card ids into multicol runs and full-width wide singles.
+ * Wide cards must sit outside CSS multi-column containers — `column-span: all`
+ * breaks packing for sibling non-wide panels in Chromium.
+ */
+export function segmentVisibleCards<T extends string>(
+  ids: readonly T[],
+  wideSet: ReadonlySet<T>,
+): CardSegment<T>[] {
+  const segments: CardSegment<T>[] = [];
+  let gridIds: T[] = [];
+
+  const flushGrid = () => {
+    if (gridIds.length === 0) return;
+    segments.push({ type: 'grid', ids: gridIds });
+    gridIds = [];
+  };
+
+  for (const id of ids) {
+    if (wideSet.has(id)) {
+      flushGrid();
+      segments.push({ type: 'wide', id });
+    } else {
+      gridIds.push(id);
+    }
+  }
+  flushGrid();
+  return segments;
+}

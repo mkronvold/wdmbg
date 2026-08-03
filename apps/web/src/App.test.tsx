@@ -626,8 +626,8 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
     });
 
-    const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
-    expect(flows).not.toHaveClass('is-wide-card');
+    const flowsPanel = () => view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
+    expect(flowsPanel()).not.toHaveClass('is-wide-card');
     expect(
       view.queryByRole('button', { name: /Make Hot flows full width/i }),
     ).not.toBeInTheDocument();
@@ -637,7 +637,8 @@ describe('App', () => {
     expect(wideBtn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(wideBtn);
 
-    expect(flows).toHaveClass('is-wide-card');
+    // Panel remounts under `.grid-wide` when width toggles — re-query the section.
+    expect(flowsPanel()).toHaveClass('is-wide-card');
     expect(view.getByRole('button', { name: 'Make Hot flows normal width' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -647,7 +648,7 @@ describe('App', () => {
     ]);
 
     fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
-    expect(flows).toHaveClass('is-wide-card');
+    expect(flowsPanel()).toHaveClass('is-wide-card');
     expect(view.queryByRole('button', { name: /Make Hot flows/i })).not.toBeInTheDocument();
   });
 
@@ -661,6 +662,29 @@ describe('App', () => {
     expect(view.getByRole('heading', { name: 'Top talkers' }).closest('section')).toHaveClass(
       'is-wide-card',
     );
+  });
+
+  it('renders wide cards outside multicol grids and keeps non-wide siblings together', async () => {
+    localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['hotFlows']));
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+    });
+
+    const boards = container.querySelector('.dashboard-boards');
+    expect(boards).toBeTruthy();
+
+    const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
+    expect(flows).toHaveClass('is-wide-card');
+    expect(flows.closest('.grid-wide')).toBeTruthy();
+    expect(flows.closest('.grid')).toBeNull();
+
+    const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
+    const receivers = view.getByRole('heading', { name: 'Top receivers' }).closest('section')!;
+    expect(talkers.closest('.grid')).toBeTruthy();
+    expect(talkers.closest('.grid')).toBe(receivers.closest('.grid'));
+    expect(talkers.closest('.grid')).not.toBe(flows.closest('.grid-wide'));
   });
 
   it('persists table sort order and restores it on reload', async () => {
