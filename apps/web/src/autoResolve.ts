@@ -7,9 +7,11 @@ export type ResolveNameMode = 'disabled' | 'auto';
 const BATCH_SIZE = 40;
 const DEBOUNCE_MS = 600;
 const ERROR_BACKOFF_MS = 5_000;
+/** Skip re-resolve after miss/error; allow retry after TTL so labels can recover when server cache expires. */
+export const NEGATIVE_CACHE_TTL_MS = 12 * 60 * 1000;
 
-/** Session-scoped: do not re-resolve the same IP after an attempt. */
-const attemptedIps = new Set<string>();
+/** Session-scoped negative cache: IP → retry-after timestamp (miss or error). */
+const negativeCache = new Map<string, number>();
 const inFlightIps = new Set<string>();
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -40,9 +42,19 @@ export function needsName(host: string, label?: string | null): boolean {
   return !(label && label.trim());
 }
 
+function isNegativelyCached(host: string, now = Date.now()): boolean {
+  const until = negativeCache.get(host);
+  if (until === undefined) return false;
+  if (until <= now) {
+    negativeCache.delete(host);
+    return false;
+  }
+  return true;
+}
+
 function consider(host: string, label: string | undefined | null, out: Set<string>) {
   if (!needsName(host, label)) return;
-  if (attemptedIps.has(host) || inFlightIps.has(host)) return;
+  if (isNegativelyCached(host) || inFlightIps.has(host)) return;
   out.add(host);
 }
 
@@ -82,13 +94,17 @@ export function collectUnnamedFromHost(
   return [...out];
 }
 
+function rememberNegative(ip: string, now = Date.now()): void {
+  negativeCache.set(ip, now + NEGATIVE_CACHE_TTL_MS);
+}
+
 async function flushPending(onResolved: () => void | Promise<void>): Promise<void> {
   const now = Date.now();
   if (now < backoffUntil) return;
 
   const batch: string[] = [];
   for (const ip of pendingIps) {
-    if (attemptedIps.has(ip) || inFlightIps.has(ip)) {
+    if (isNegativelyCached(ip, now) || inFlightIps.has(ip)) {
       pendingIps.delete(ip);
       continue;
     }
@@ -103,16 +119,29 @@ async function flushPending(onResolved: () => void | Promise<void>): Promise<voi
   }
 
   try {
-    await resolveHosts(batch);
+    const response = await resolveHosts(batch);
+    const seen = new Set<string>();
+    for (const result of response.results) {
+      seen.add(result.host);
+      inFlightIps.delete(result.host);
+      // Successful hostname: rely on row labels after invalidate; do not permanent-ban.
+      if (!result.hostname) {
+        rememberNegative(result.host);
+      } else {
+        negativeCache.delete(result.host);
+      }
+    }
     for (const ip of batch) {
-      attemptedIps.add(ip);
-      inFlightIps.delete(ip);
+      if (!seen.has(ip)) {
+        inFlightIps.delete(ip);
+        rememberNegative(ip);
+      }
     }
     await onResolved();
   } catch {
     for (const ip of batch) {
-      attemptedIps.add(ip);
       inFlightIps.delete(ip);
+      rememberNegative(ip);
     }
     backoffUntil = Date.now() + ERROR_BACKOFF_MS;
   }
@@ -123,13 +152,13 @@ async function flushPending(onResolved: () => void | Promise<void>): Promise<voi
 }
 
 /**
- * Queue unnamed IPs for batched resolve. Debounced; skips already attempted / in-flight.
+ * Queue unnamed IPs for batched resolve. Debounced; skips negative-cached / in-flight.
  * `onResolved` runs after a successful batch (typically query invalidation).
  */
 export function queueAutoResolve(ips: string[], onResolved: () => void | Promise<void>): void {
   if (ips.length === 0) return;
   for (const ip of ips) {
-    if (!ip || attemptedIps.has(ip) || inFlightIps.has(ip)) continue;
+    if (!ip || isNegativelyCached(ip) || inFlightIps.has(ip)) continue;
     pendingIps.add(ip);
   }
   if (pendingIps.size === 0) return;
@@ -143,7 +172,7 @@ export function queueAutoResolve(ips: string[], onResolved: () => void | Promise
 
 /** Test helper: reset module state between tests. */
 export function resetAutoResolveStateForTests(): void {
-  attemptedIps.clear();
+  negativeCache.clear();
   inFlightIps.clear();
   pendingIps = new Set();
   backoffUntil = 0;

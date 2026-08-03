@@ -229,7 +229,8 @@ export function adguardConfigFromEnv(env: NodeJS.ProcessEnv = process.env): AdGu
     enabled,
     timeoutMs: parsePositiveInt(env.WDMBG_ADGUARD_TIMEOUT_MS, 1500),
     refreshMs: parsePositiveInt(env.WDMBG_ADGUARD_REFRESH_MS, 5 * 60 * 1000),
-    cacheTtlMs: parsePositiveInt(env.WDMBG_ADGUARD_CACHE_TTL_MS, 10 * 60 * 1000),
+    // DHCP/rewrite/client names are stable on a home LAN; default 12h (was 10m).
+    cacheTtlMs: parsePositiveInt(env.WDMBG_ADGUARD_CACHE_TTL_MS, 12 * 60 * 60 * 1000),
   };
   if (baseUrl) config.baseUrl = baseUrl;
   const username = env.WDMBG_ADGUARD_USER?.trim();

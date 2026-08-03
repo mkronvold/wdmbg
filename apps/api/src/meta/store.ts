@@ -161,7 +161,7 @@ export class MemoryMetaStore implements MetaStore {
     adguard?: AdGuardNameProvider | null;
   }) {
     this.cacheTtlMs = opts?.cacheTtlMs ?? 60 * 60 * 1000;
-    this.adguardCacheTtlMs = opts?.adguardCacheTtlMs ?? 10 * 60 * 1000;
+    this.adguardCacheTtlMs = opts?.adguardCacheTtlMs ?? 12 * 60 * 60 * 1000;
     this.ptrEnabled = opts?.ptrEnabled ?? true;
     this.countryByIp = opts?.countryByIp ?? new Map();
     this.adguard = opts?.adguard ?? null;
