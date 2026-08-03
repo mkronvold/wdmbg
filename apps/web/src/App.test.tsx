@@ -293,7 +293,11 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
 
-    const expectSort = (title: string, header: RegExp | string, dir: 'ascending' | 'descending') => {
+    const expectSort = (
+      title: string,
+      header: RegExp | string,
+      dir: 'ascending' | 'descending',
+    ) => {
       const section = view.getByRole('heading', { name: title }).closest('section')!;
       expect(within(section).getByRole('columnheader', { name: header })).toHaveAttribute(
         'aria-sort',
