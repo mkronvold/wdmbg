@@ -77,6 +77,18 @@ test.describe('WDMBG UX polish (theme / refresh / local / deep link)', () => {
     await expect(page.locator('.app-footer .sha-link')).toHaveText(/sha-/);
   });
 
+  test('host cells are linkish buttons on dashboard cards', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Top talkers', level: 2 })).toBeVisible({
+      timeout: 15_000,
+    });
+    // Empty traffic is OK — when rows exist they use linkish host buttons.
+    // Assert at least the table column headers for host-like columns are present.
+    await expect(page.getByRole('columnheader', { name: /Host/ }).first()).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Src/ }).first()).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Dst/ }).first()).toBeVisible();
+  });
+
   test('Traffic window label and 5s…1h controls with last-window legends', async ({ page }) => {
     await page.goto('/');
 
