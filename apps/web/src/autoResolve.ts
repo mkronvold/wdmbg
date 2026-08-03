@@ -26,7 +26,7 @@ export function loadResolveNameMode(): ResolveNameMode {
   } catch {
     // ignore
   }
-  return 'disabled';
+  return 'auto';
 }
 
 export function saveResolveNameMode(mode: ResolveNameMode) {

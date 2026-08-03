@@ -123,8 +123,17 @@ function loadIdList(key: string, urlCards: readonly UrlCardDef[]): DashboardCard
   return filterKnownIds(readJsonLocal(key), known) as DashboardCardId[];
 }
 
+/** First-run hidden cards when wdmbg.dashboard.hiddenCards is unset. */
+const DEFAULT_HIDDEN_CARDS: BuiltinCardId[] = ['topLocalTalkers', 'topLocalReceivers'];
+
 function loadHiddenCards(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
-  return loadIdList(HIDDEN_CARDS_KEY, urlCards);
+  const known = knownDashboardIds(DEFAULT_CARD_ORDER, urlCards);
+  const raw = readJsonLocal(HIDDEN_CARDS_KEY);
+  // Missing/invalid pref only — empty [] is a saved "show all" choice.
+  if (raw === null) {
+    return DEFAULT_HIDDEN_CARDS.filter((id) => known.has(id)) as DashboardCardId[];
+  }
+  return filterKnownIds(raw, known) as DashboardCardId[];
 }
 
 function saveHiddenCards(ids: DashboardCardId[]) {
