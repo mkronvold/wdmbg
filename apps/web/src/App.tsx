@@ -34,6 +34,7 @@ const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
 
 const CARD_ORDER_KEY = 'wdmbg.dashboard.cardOrder';
 const HIDDEN_CARDS_KEY = 'wdmbg.dashboard.hiddenCards';
+const WIDE_CARDS_KEY = 'wdmbg.dashboard.wideCards';
 const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
 const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 const TRAFFIC_WINDOW_KEY = 'wdmbg.trafficWindow';
@@ -121,6 +122,35 @@ function loadHiddenCards(): CardId[] {
 function saveHiddenCards(ids: CardId[]) {
   try {
     localStorage.setItem(HIDDEN_CARDS_KEY, JSON.stringify(ids));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function loadWideCards(): CardId[] {
+  try {
+    const raw = localStorage.getItem(WIDE_CARDS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const known = new Set<string>(DEFAULT_CARD_ORDER);
+    const seen = new Set<string>();
+    const wide: CardId[] = [];
+    for (const id of parsed) {
+      if (typeof id === 'string' && known.has(id) && !seen.has(id)) {
+        wide.push(id as CardId);
+        seen.add(id);
+      }
+    }
+    return wide;
+  } catch {
+    return [];
+  }
+}
+
+function saveWideCards(ids: CardId[]) {
+  try {
+    localStorage.setItem(WIDE_CARDS_KEY, JSON.stringify(ids));
   } catch {
     // ignore quota / private mode
   }
@@ -238,6 +268,7 @@ export function App() {
   );
   const [cardOrder, setCardOrder] = useState<CardId[]>(() => loadCardOrder());
   const [hiddenCards, setHiddenCards] = useState<CardId[]>(() => loadHiddenCards());
+  const [wideCards, setWideCards] = useState<CardId[]>(() => loadWideCards());
   const [editMode, setEditMode] = useState(false);
   const [draggingId, setDraggingId] = useState<CardId | null>(null);
   const [dragOverId, setDragOverId] = useState<CardId | null>(null);
@@ -432,7 +463,19 @@ export function App() {
     });
   }, []);
 
+  const onToggleWide = useCallback((cardId: CardId) => {
+    setWideCards((prev) => {
+      const set = new Set(prev);
+      if (set.has(cardId)) set.delete(cardId);
+      else set.add(cardId);
+      const next = DEFAULT_CARD_ORDER.filter((id) => set.has(id));
+      saveWideCards(next);
+      return next;
+    });
+  }, []);
+
   const hiddenSet = useMemo(() => new Set(hiddenCards), [hiddenCards]);
+  const wideSet = useMemo(() => new Set(wideCards), [wideCards]);
 
   const cardChrome = (cardId: CardId) => ({
     cardId,
@@ -440,6 +483,8 @@ export function App() {
     editMode,
     hidden: hiddenSet.has(cardId),
     onToggleHidden: () => onToggleHidden(cardId),
+    wide: wideSet.has(cardId),
+    onToggleWide: () => onToggleWide(cardId),
     isDragging: draggingId === cardId,
     isDragOver: dragOverId === cardId,
     onDragStart,

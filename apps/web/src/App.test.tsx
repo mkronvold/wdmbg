@@ -618,4 +618,106 @@ describe('App', () => {
       expect(within(dialog).getByRole('columnheader', { name: 'Country' })).toBeInTheDocument();
     });
   });
+
+  it('toggles wide cards in edit mode and persists preference', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Hot flows' })).toBeInTheDocument();
+    });
+
+    const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
+    expect(flows).not.toHaveClass('is-wide-card');
+    expect(
+      view.queryByRole('button', { name: /Make Hot flows full width/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    const wideBtn = view.getByRole('button', { name: 'Make Hot flows full width' });
+    expect(wideBtn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(wideBtn);
+
+    expect(flows).toHaveClass('is-wide-card');
+    expect(view.getByRole('button', { name: 'Make Hot flows normal width' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).toEqual([
+      'hotFlows',
+    ]);
+
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    expect(flows).toHaveClass('is-wide-card');
+    expect(view.queryByRole('button', { name: /Make Hot flows/i })).not.toBeInTheDocument();
+  });
+
+  it('restores wide cards from localStorage on load', async () => {
+    localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['topTalkers']));
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    expect(view.getByRole('heading', { name: 'Top talkers' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
+  });
+
+  it('persists table sort order and restores it on reload', async () => {
+    const { container, unmount } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+    });
+
+    const protocols = view.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
+    fireEvent.click(within(protocols).getByRole('button', { name: 'Sort by Protocol' }));
+    expect(within(protocols).getByRole('columnheader', { name: /Protocol/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+    expect(JSON.parse(localStorage.getItem('wdmbg.tableSort') ?? '{}')).toMatchObject({
+      topProtocols: { key: 'p', dir: 'desc' },
+    });
+
+    fireEvent.click(within(protocols).getByRole('button', { name: 'Sort by Protocol' }));
+    expect(within(protocols).getByRole('columnheader', { name: /Protocol/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+    expect(JSON.parse(localStorage.getItem('wdmbg.tableSort') ?? '{}')).toMatchObject({
+      topProtocols: { key: 'p', dir: 'asc' },
+    });
+
+    unmount();
+    const again = renderApp();
+    const view2 = within(again.container);
+    await waitFor(() => {
+      expect(view2.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+    });
+    const protocols2 = view2.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
+    expect(within(protocols2).getByRole('columnheader', { name: /Protocol/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+  });
+
+  it('persists HostDialog table sort with stable table ids', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    const dlg = within(dialog);
+    await waitFor(() => {
+      expect(dlg.getByRole('heading', { name: 'Totals' })).toBeInTheDocument();
+    });
+    const totals = dlg.getByRole('heading', { name: 'Totals' }).closest('section')!;
+    fireEvent.click(within(totals).getByRole('button', { name: 'Sort by TX MB' }));
+    expect(JSON.parse(localStorage.getItem('wdmbg.tableSort') ?? '{}')).toMatchObject({
+      'host-totals': { key: 'tx', dir: 'desc' },
+    });
+  });
 });
