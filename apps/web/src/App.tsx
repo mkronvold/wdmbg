@@ -721,13 +721,6 @@ export function App() {
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
           {
-            key: 'rx',
-            header: 'RX MB',
-            numeric: true,
-            render: (r: TalkerRow) => formatMb(r.rxBytes),
-            sortValue: (r: TalkerRow) => r.rxBytes,
-          },
-          {
             key: 'tx',
             header: 'TX MB',
             numeric: true,
@@ -735,10 +728,10 @@ export function App() {
             sortValue: (r: TalkerRow) => r.txBytes,
           },
           {
-            key: 'rxr',
-            header: 'RX Mbps',
+            key: 'rx',
+            header: 'RX MB',
             numeric: true,
-            render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            render: (r: TalkerRow) => formatMb(r.rxBytes),
             sortValue: (r: TalkerRow) => r.rxBytes,
           },
           {
@@ -747,6 +740,13 @@ export function App() {
             numeric: true,
             render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
             sortValue: (r: TalkerRow) => r.txBytes,
+          },
+          {
+            key: 'rxr',
+            header: 'RX Mbps',
+            numeric: true,
+            render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: TalkerRow) => r.rxBytes,
           },
           ...(geoipPresent
             ? [
@@ -837,13 +837,6 @@ export function App() {
             onCellClick: (r: TalkerRow) => selectHost(r.host),
           },
           {
-            key: 'rx',
-            header: 'RX MB',
-            numeric: true,
-            render: (r: TalkerRow) => formatMb(r.rxBytes),
-            sortValue: (r: TalkerRow) => r.rxBytes,
-          },
-          {
             key: 'tx',
             header: 'TX MB',
             numeric: true,
@@ -851,10 +844,10 @@ export function App() {
             sortValue: (r: TalkerRow) => r.txBytes,
           },
           {
-            key: 'rxr',
-            header: 'RX Mbps',
+            key: 'rx',
+            header: 'RX MB',
             numeric: true,
-            render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            render: (r: TalkerRow) => formatMb(r.rxBytes),
             sortValue: (r: TalkerRow) => r.rxBytes,
           },
           {
@@ -863,6 +856,13 @@ export function App() {
             numeric: true,
             render: (r: TalkerRow) => formatMbps(r.txBytes, secs),
             sortValue: (r: TalkerRow) => r.txBytes,
+          },
+          {
+            key: 'rxr',
+            header: 'RX Mbps',
+            numeric: true,
+            render: (r: TalkerRow) => formatMbps(r.rxBytes, secs),
+            sortValue: (r: TalkerRow) => r.rxBytes,
           },
           ...(geoipPresent
             ? [
