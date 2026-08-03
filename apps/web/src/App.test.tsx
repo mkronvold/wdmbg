@@ -230,8 +230,9 @@ describe('App', () => {
     expect(view.getByText('Internet')).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'TX Rate' })).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'RX Rate' })).toBeInTheDocument();
-    expect(view.getByRole('heading', { name: 'Top Local Talkers' })).toBeInTheDocument();
-    expect(view.getByRole('heading', { name: 'Top Local Receivers' })).toBeInTheDocument();
+    // Local talkers/receivers hidden by default outside edit mode
+    expect(view.queryByRole('heading', { name: 'Top Local Talkers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top Local Receivers' })).not.toBeInTheDocument();
     // Drag handles are edit-mode only
     expect(view.queryByLabelText(/Drag to reorder Top talkers/i)).not.toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
@@ -239,6 +240,8 @@ describe('App', () => {
     expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Hide Top talkers' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Local Talkers' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Local Receivers' })).toBeInTheDocument();
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
     expect(view.getByText('sha-dev')).toBeInTheDocument();
@@ -270,6 +273,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
 
     const expected = ['Host', 'TX MB', 'RX MB', 'TX Mbps', 'RX Mbps'];
     for (const title of [
@@ -292,6 +296,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
 
     const expectSort = (
       title: string,
@@ -331,7 +336,7 @@ describe('App', () => {
     });
 
     const protocols = dlg.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
-    expect(within(protocols).getByRole('columnheader', { name: /^MB/ })).toHaveAttribute(
+    expect(within(protocols).getByRole('columnheader', { name: /Total MB/ })).toHaveAttribute(
       'aria-sort',
       'descending',
     );
@@ -544,6 +549,8 @@ describe('App', () => {
   });
 
   it('pauses dashboard refetching via Display Refresh and shows paused state', async () => {
+    // Disable auto-resolve so name resolution invalidations do not refetch during pause.
+    localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
@@ -626,54 +633,47 @@ describe('App', () => {
     ).toHaveClass('primary');
   });
 
-  it('defaults Resolve Name to Disabled and does not auto-resolve', async () => {
+  it('defaults Resolve Name to Auto and auto-resolves unnamed IPs', async () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
 
-    expect(view.getByRole('button', { name: 'Resolve Name Disabled' })).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    expect(vi.mocked(client.resolveHosts)).not.toHaveBeenCalled();
-  });
-
-  it('auto-resolves unnamed dashboard IPs when Resolve Name is Auto and persists', async () => {
-    const { container } = renderApp();
-    const view = within(container);
-    await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
-    });
-
-    fireEvent.click(view.getByRole('button', { name: 'Resolve Name Disabled' }));
     expect(view.getByRole('button', { name: 'Resolve Name Auto' })).toBeInTheDocument();
-    expect(localStorage.getItem(RESOLVE_NAME_KEY)).toBe('auto');
-
     await waitFor(
       () => {
         expect(vi.mocked(client.resolveHosts)).toHaveBeenCalled();
       },
       { timeout: 2000 },
     );
-
     const resolved = vi.mocked(client.resolveHosts).mock.calls.flatMap((c) => c[0] as string[]);
     expect(resolved).toContain('1.1.1.1');
     expect(resolved).not.toContain('10.0.0.10');
   });
 
-  it('restores Resolve Name Auto preference on load', async () => {
-    localStorage.setItem(RESOLVE_NAME_KEY, 'auto');
-    const { container } = renderApp();
+  it('persists Resolve Name Disabled when toggled off', async () => {
+    const { container, unmount } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('button', { name: 'Resolve Name Auto' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
-    await waitFor(
-      () => {
-        expect(vi.mocked(client.resolveHosts)).toHaveBeenCalled();
-      },
-      { timeout: 2000 },
-    );
+
+    fireEvent.click(view.getByRole('button', { name: 'Resolve Name Auto' }));
+    expect(view.getByRole('button', { name: 'Resolve Name Disabled' })).toBeInTheDocument();
+    expect(localStorage.getItem(RESOLVE_NAME_KEY)).toBe('disabled');
+
+    unmount();
+    resetAutoResolveStateForTests();
+    vi.mocked(client.resolveHosts).mockClear();
+
+    const again = renderApp();
+    const view2 = within(again.container);
+    await waitFor(() => {
+      expect(view2.getByRole('button', { name: 'Resolve Name Disabled' })).toBeInTheDocument();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(vi.mocked(client.resolveHosts)).not.toHaveBeenCalled();
   });
 
   it('shows Top traffic by country only when geoip present', async () => {
@@ -981,6 +981,30 @@ describe('App', () => {
     fireEvent.click(within(addForm).getByRole('button', { name: 'Add card' }));
     expect(view.getByRole('alert')).toHaveTextContent(/https/i);
     expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]')).toEqual([]);
+  });
+
+  it('hides Top local talkers/receivers by default without clobbering saved hidden prefs', async () => {
+    const { container, unmount } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    expect(view.queryByRole('heading', { name: 'Top Local Talkers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top Local Receivers' })).not.toBeInTheDocument();
+    // Defaults are in-memory only until the user toggles hide
+    expect(localStorage.getItem('wdmbg.dashboard.hiddenCards')).toBeNull();
+
+    unmount();
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify(['topProtocols']));
+    const again = renderApp();
+    const view2 = within(again.container);
+    await waitFor(() => {
+      expect(view2.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    expect(view2.queryByRole('heading', { name: 'Top protocols' })).not.toBeInTheDocument();
+    // Saved pref wins — locals are visible when not in the saved hidden list
+    expect(view2.getByRole('heading', { name: 'Top Local Talkers' })).toBeInTheDocument();
+    expect(view2.getByRole('heading', { name: 'Top Local Receivers' })).toBeInTheDocument();
   });
 
   it('drops orphan url card refs and invalid defs on load', async () => {

@@ -202,7 +202,7 @@ export function HostDialog({
               },
               {
                 key: 'b',
-                header: 'MB',
+                header: 'Total MB',
                 numeric: true,
                 render: (r: ProtocolRow) => formatMb(r.bytes),
                 sortValue: (r: ProtocolRow) => r.bytes,

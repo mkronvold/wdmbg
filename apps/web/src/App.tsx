@@ -123,7 +123,17 @@ function loadIdList(key: string, urlCards: readonly UrlCardDef[]): DashboardCard
   return filterKnownIds(readJsonLocal(key), known) as DashboardCardId[];
 }
 
+const DEFAULT_HIDDEN_CARDS: BuiltinCardId[] = ['topLocalTalkers', 'topLocalReceivers'];
+
 function loadHiddenCards(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
+  try {
+    // Only apply defaults when the user has never saved a hidden-cards pref.
+    if (localStorage.getItem(HIDDEN_CARDS_KEY) === null) {
+      return [...DEFAULT_HIDDEN_CARDS];
+    }
+  } catch {
+    return [...DEFAULT_HIDDEN_CARDS];
+  }
   return loadIdList(HIDDEN_CARDS_KEY, urlCards);
 }
 

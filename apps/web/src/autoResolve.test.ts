@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as client from './api/client';
 import {
   NEGATIVE_CACHE_TTL_MS,
+  RESOLVE_NAME_KEY,
   collectUnnamedFromDashboard,
+  loadResolveNameMode,
   needsName,
   queueAutoResolve,
   resetAutoResolveStateForTests,
@@ -37,11 +39,30 @@ describe('autoResolve', () => {
     resetAutoResolveStateForTests();
     vi.useFakeTimers();
     vi.mocked(client.resolveHosts).mockReset();
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, String(v));
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+      clear: () => store.clear(),
+    });
   });
 
   afterEach(() => {
     resetAutoResolveStateForTests();
     vi.useRealTimers();
+  });
+
+  it('defaults resolve name mode to auto when unset', () => {
+    expect(loadResolveNameMode()).toBe('auto');
+    localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
+    expect(loadResolveNameMode()).toBe('disabled');
+    localStorage.setItem(RESOLVE_NAME_KEY, 'auto');
+    expect(loadResolveNameMode()).toBe('auto');
   });
 
   it('needsName is true only when label missing', () => {
