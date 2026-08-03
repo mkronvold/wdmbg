@@ -561,7 +561,12 @@ export function App() {
         isDragOver={dragOverId === 'topProtocols'}
         {...dragProps}
         columns={[
-          { key: 'p', header: 'Protocol', width: 'primary', render: (r: ProtocolRow) => r.protocol },
+          {
+            key: 'p',
+            header: 'Protocol',
+            width: 'primary',
+            render: (r: ProtocolRow) => r.protocol,
+          },
           {
             key: 'b',
             header: 'MB',

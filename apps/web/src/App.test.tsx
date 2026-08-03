@@ -210,22 +210,36 @@ describe('App', () => {
 
     const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
     expect(within(talkers).getByRole('columnheader', { name: 'Host' })).toHaveClass('col-primary');
-    expect(within(talkers).getByRole('columnheader', { name: 'TX MB' })).toHaveClass('col-min', 'num');
+    expect(within(talkers).getByRole('columnheader', { name: 'TX MB' })).toHaveClass(
+      'col-min',
+      'num',
+    );
 
     const summary = view.getByRole('heading', { name: 'Traffic summary' }).closest('section')!;
-    expect(within(summary).getByRole('columnheader', { name: 'Bucket' })).toHaveClass('col-primary');
-    expect(within(summary).getByRole('columnheader', { name: 'TX Rate' })).toHaveClass('col-min', 'num');
+    expect(within(summary).getByRole('columnheader', { name: 'Bucket' })).toHaveClass(
+      'col-primary',
+    );
+    expect(within(summary).getByRole('columnheader', { name: 'TX Rate' })).toHaveClass(
+      'col-min',
+      'num',
+    );
 
     const protocols = view.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
     expect(within(protocols).getByRole('columnheader', { name: 'Protocol' })).toHaveClass(
       'col-primary',
     );
-    expect(within(protocols).getByRole('columnheader', { name: 'MB' })).toHaveClass('col-min', 'num');
+    expect(within(protocols).getByRole('columnheader', { name: 'MB' })).toHaveClass(
+      'col-min',
+      'num',
+    );
 
     const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
     expect(within(flows).getByRole('columnheader', { name: 'Dst' })).toHaveClass('col-primary');
     expect(within(flows).getByRole('columnheader', { name: 'Src' })).toHaveClass('col-min');
-    expect(within(flows).getByRole('columnheader', { name: 'SPort' })).toHaveClass('col-min', 'num');
+    expect(within(flows).getByRole('columnheader', { name: 'SPort' })).toHaveClass(
+      'col-min',
+      'num',
+    );
     expect(within(flows).getByRole('columnheader', { name: 'L4' })).toHaveClass('col-min');
   });
 
