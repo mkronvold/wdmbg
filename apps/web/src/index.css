@@ -93,7 +93,7 @@ body {
 .theme-control {
   display: grid;
   gap: 0.25rem;
-  justify-items: end;
+  justify-items: start;
 }
 
 .window-label {
@@ -101,6 +101,7 @@ body {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  text-align: left;
   color: var(--theme-muted-text);
 }
 
@@ -108,7 +109,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  justify-content: flex-end;
+  justify-content: flex-start;
   max-width: 22rem;
 }
 
@@ -490,14 +491,11 @@ code {
     max-width: 8rem;
   }
 
-  .hero-meta,
-  .window-control,
-  .theme-control {
+  .hero-meta {
     justify-items: start;
   }
 
-  .hero-controls,
-  .window-toggle {
+  .hero-controls {
     justify-content: flex-start;
   }
 }
