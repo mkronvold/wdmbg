@@ -22,6 +22,10 @@ function emptyDash(overrides: Partial<Dashboard> = {}): Dashboard {
     topProtocols: [],
     topCountries: [],
     hotFlows: [],
+    summary: {
+      local: { txBytes: 0, rxBytes: 0, totalBytes: 0 },
+      internet: { txBytes: 0, rxBytes: 0, totalBytes: 0 },
+    },
     ...overrides,
   };
 }
