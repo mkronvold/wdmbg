@@ -37,12 +37,15 @@ export function HostDialog({
 }: HostDialogProps) {
   const qc = useQueryClient();
   const [aliasDraft, setAliasDraft] = useState('');
+  const [aliasHost, setAliasHost] = useState(host);
   const secs = WINDOW_SECONDS[window];
   const legend = windowLegend(window);
 
-  useEffect(() => {
+  // Reset draft when the selected host changes (prefer render-time adjust over effect).
+  if (aliasHost !== host) {
+    setAliasHost(host);
     setAliasDraft('');
-  }, [host]);
+  }
 
   const selectHost = (next: string) => {
     onSelectHost?.(next);
