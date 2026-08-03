@@ -1,6 +1,8 @@
-import type { DragEvent } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import { CopyButton } from './CopyButton';
 import { rowsToCsv, rowsToRich } from './tableCopy';
+
+export type SortDir = 'asc' | 'desc';
 
 export interface Column<T> {
   key: string;
@@ -11,6 +13,8 @@ export interface Column<T> {
   cellClassName?: string;
   /** Numeric columns get tabular alignment. */
   numeric?: boolean;
+  /** Optional value used for sorting (defaults to render()). */
+  sortValue?: (row: T) => string | number;
 }
 
 export interface DataTableProps<T> {
@@ -32,6 +36,13 @@ export interface DataTableProps<T> {
   onDragEnd?: (event: DragEvent<HTMLElement>) => void;
 }
 
+function compareValues(a: string | number, b: string | number): number {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return a - b;
+  }
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+}
+
 export function DataTable<T>({
   title,
   columns,
@@ -48,8 +59,24 @@ export function DataTable<T>({
   onDrop,
   onDragEnd,
 }: DataTableProps<T>) {
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows;
+    const col = columns.find((c) => c.key === sortKey);
+    if (!col) return rows;
+    const pick = (row: T) => (col.sortValue ? col.sortValue(row) : col.render(row));
+    const mul = sortDir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => mul * compareValues(pick(a), pick(b)));
+  }, [columns, rows, sortDir, sortKey]);
+
+  const sortCol = sortKey ? columns.find((c) => c.key === sortKey) : undefined;
+  const legendText =
+    legend && sortCol ? `${legend} · sorted by ${sortCol.header} ${sortDir}` : legend;
+
   const headers = columns.map((c) => c.header);
-  const stringRows = rows.map((row) => columns.map((c) => String(c.render(row))));
+  const stringRows = sortedRows.map((row) => columns.map((c) => String(c.render(row))));
   const csv = rowsToCsv(headers, stringRows);
   const rich = rowsToRich(headers, stringRows);
 
@@ -61,6 +88,15 @@ export function DataTable<T>({
   ]
     .filter(Boolean)
     .join(' ');
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortKey(key);
+    setSortDir('desc');
+  };
 
   return (
     <section
@@ -101,26 +137,42 @@ export function DataTable<T>({
             )}
             <h2>{title}</h2>
           </div>
-          {legend ? <p className="panel-legend">{legend}</p> : null}
+          {legendText ? <p className="panel-legend">{legendText}</p> : null}
         </div>
         <CopyButton richText={rich} csvText={csv} />
       </div>
-      {rows.length === 0 ? (
+      {sortedRows.length === 0 ? (
         <p className="muted">{empty}</p>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                {columns.map((c) => (
-                  <th key={c.key} className={c.numeric ? 'num' : undefined}>
-                    {c.header}
-                  </th>
-                ))}
+                {columns.map((c) => {
+                  const active = sortKey === c.key;
+                  const ariaSort = active
+                    ? sortDir === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none';
+                  return (
+                    <th key={c.key} className={c.numeric ? 'num' : undefined} aria-sort={ariaSort}>
+                      <button
+                        type="button"
+                        className={`th-sort${active ? ' is-active' : ''}`}
+                        onClick={() => toggleSort(c.key)}
+                        aria-label={`Sort by ${c.header}`}
+                      >
+                        {c.header}
+                        {active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+                      </button>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, idx) => (
+              {sortedRows.map((row, idx) => (
                 <tr key={idx}>
                   {columns.map((c) => {
                     const value = c.render(row);

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  flowRowSchema,
   healthSchema,
   isLocalAddress,
+  isLocalPair,
   resolveResultSchema,
   resolveSourceSchema,
   RING_BUCKET_COUNT,
@@ -11,13 +13,15 @@ import {
 } from './index.js';
 
 describe('healthSchema', () => {
-  it('accepts a valid health payload', () => {
+  it('accepts a valid health payload with geoip status', () => {
     const parsed = healthSchema.parse({
       status: 'ok',
       service: 'wdmbg-api',
       version: '0.0.0',
+      geoip: { configured: false, present: false },
     });
     expect(parsed.status).toBe('ok');
+    expect(parsed.geoip).toEqual({ configured: false, present: false });
   });
 });
 
@@ -85,6 +89,32 @@ describe('isLocalAddress', () => {
     expect(isLocalAddress('127.0.0.1')).toBe(true);
     expect(isLocalAddress('8.8.8.8')).toBe(false);
     expect(isLocalAddress('1.1.1.1')).toBe(false);
+  });
+});
+
+describe('isLocalPair', () => {
+  it('is true only when both ends are local', () => {
+    expect(isLocalPair('10.0.0.1', '192.168.1.1')).toBe(true);
+    expect(isLocalPair('10.0.0.1', '1.1.1.1')).toBe(false);
+    expect(isLocalPair('8.8.8.8', '1.1.1.1')).toBe(false);
+  });
+});
+
+describe('flowRowSchema', () => {
+  it('accepts optional src/dst labels', () => {
+    const parsed = flowRowSchema.parse({
+      src: '10.0.0.1',
+      srcPort: 1,
+      dst: '1.1.1.1',
+      dstPort: 443,
+      l4: 'tcp',
+      bytes: 10,
+      packets: 1,
+      srcLabel: 'nas',
+      dstLabel: 'cloudflare',
+    });
+    expect(parsed.srcLabel).toBe('nas');
+    expect(parsed.dstLabel).toBe('cloudflare');
   });
 });
 

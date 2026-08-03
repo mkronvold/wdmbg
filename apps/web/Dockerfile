@@ -10,6 +10,8 @@ COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter @wdmbg/web...
 COPY packages/contracts packages/contracts
 COPY apps/web apps/web
+ARG VITE_GIT_SHA=dev
+ENV VITE_GIT_SHA=$VITE_GIT_SHA
 RUN pnpm --filter @wdmbg/contracts build \
   && pnpm --filter @wdmbg/web build
 

@@ -1,5 +1,6 @@
 import {
   isLocalAddress,
+  isLocalPair,
   type CountryRow,
   type FlowRow,
   type ProtocolRow,
@@ -19,12 +20,22 @@ export const defaultCountryLookup: LabelLookup = {
   getCountry: (host: string) => (isLocalAddress(host) ? 'Local' : 'Unknown'),
 };
 
+export interface AggregateOptions {
+  /** When true, drop local↔local flows before aggregation. */
+  excludeLocal?: boolean;
+}
+
 function protocolOf(flow: StoredFlow): string {
   return flow.l7 ?? flow.l4;
 }
 
 function sortByBytesDesc<T>(rows: T[], pick: (row: T) => number, limit: number): T[] {
   return [...rows].sort((a, b) => pick(b) - pick(a)).slice(0, limit);
+}
+
+export function filterFlows(flows: StoredFlow[], opts?: AggregateOptions): StoredFlow[] {
+  if (!opts?.excludeLocal) return flows;
+  return flows.filter((f) => !isLocalPair(f.src, f.dst));
 }
 
 export function buildHostStats(
@@ -87,7 +98,11 @@ export function topProtocols(flows: StoredFlow[], limit = 10): ProtocolRow[] {
   return sortByBytesDesc([...map.values()], (r) => r.bytes, limit);
 }
 
-export function toFlowRow(flow: StoredFlow, host?: string): FlowRow {
+export function toFlowRow(
+  flow: StoredFlow,
+  host?: string,
+  labels: LabelLookup = defaultCountryLookup,
+): FlowRow {
   const bytes = flow.bytesSrcToDst + flow.bytesDstToSrc;
   const packets = flow.packetsSrcToDst + flow.packetsDstToSrc;
   const row: FlowRow = {
@@ -102,6 +117,10 @@ export function toFlowRow(flow: StoredFlow, host?: string): FlowRow {
   if (flow.l7 !== undefined) {
     row.l7 = flow.l7;
   }
+  const srcLabel = labels.getLabel(flow.src);
+  const dstLabel = labels.getLabel(flow.dst);
+  if (srcLabel !== undefined) row.srcLabel = srcLabel;
+  if (dstLabel !== undefined) row.dstLabel = dstLabel;
   if (host) {
     const rel = hostRelative(host, flow);
     if (rel) {
@@ -116,9 +135,13 @@ export function toFlowRow(flow: StoredFlow, host?: string): FlowRow {
   return row;
 }
 
-export function hotFlows(flows: StoredFlow[], limit = 15): FlowRow[] {
+export function hotFlows(
+  flows: StoredFlow[],
+  limit = 15,
+  labels: LabelLookup = defaultCountryLookup,
+): FlowRow[] {
   return sortByBytesDesc(
-    flows.map((f) => toFlowRow(f)),
+    flows.map((f) => toFlowRow(f, undefined, labels)),
     (r) => r.bytes,
     limit,
   );
@@ -162,10 +185,12 @@ export function hostSummary(
   window: QueryWindow,
   nowSec = Math.floor(Date.now() / 1000),
   labels: LabelLookup = defaultCountryLookup,
+  opts?: AggregateOptions,
 ) {
-  const flows = store
-    .aggregateFlows(window, nowSec)
-    .filter((f) => f.src === host || f.dst === host);
+  const flows = filterFlows(
+    store.aggregateFlows(window, nowSec).filter((f) => f.src === host || f.dst === host),
+    opts,
+  );
   let txBytes = 0;
   let rxBytes = 0;
   const peerMap = new Map<string, TalkerRow>();
@@ -220,11 +245,13 @@ export function hostFlows(
   window: QueryWindow,
   nowSec = Math.floor(Date.now() / 1000),
   limit = 50,
+  labels: LabelLookup = defaultCountryLookup,
+  opts?: AggregateOptions,
 ) {
-  const flows = store
-    .aggregateFlows(window, nowSec)
-    .filter((f) => f.src === host || f.dst === host)
-    .map((f) => toFlowRow(f, host));
+  const flows = filterFlows(
+    store.aggregateFlows(window, nowSec).filter((f) => f.src === host || f.dst === host),
+    opts,
+  ).map((f) => toFlowRow(f, host, labels));
   return {
     host,
     window,
@@ -238,15 +265,16 @@ export function buildDashboard(
   window: QueryWindow,
   nowSec = Math.floor(Date.now() / 1000),
   labels: LabelLookup = defaultCountryLookup,
+  opts?: AggregateOptions,
 ) {
-  const flows = store.aggregateFlows(window, nowSec);
+  const flows = filterFlows(store.aggregateFlows(window, nowSec), opts);
   return {
     window,
     generatedAt: new Date(nowSec * 1000).toISOString(),
     topTalkers: topTalkers(flows, 10, labels),
     topReceivers: topReceivers(flows, 10, labels),
     topProtocols: topProtocols(flows),
-    hotFlows: hotFlows(flows),
+    hotFlows: hotFlows(flows, 15, labels),
     topCountries: topCountries(flows, 10, labels),
   };
 }

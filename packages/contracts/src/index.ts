@@ -20,10 +20,17 @@ export const l4Schema = z.enum(['tcp', 'udp', 'icmp', 'other']);
 export type L4 = z.infer<typeof l4Schema>;
 
 /** Health payload shared across API and web. */
+export const geoipStatusSchema = z.object({
+  configured: z.boolean(),
+  present: z.boolean(),
+});
+export type GeoipStatus = z.infer<typeof geoipStatusSchema>;
+
 export const healthSchema = z.object({
   status: z.literal('ok'),
   service: z.string().min(1),
   version: z.string().min(1),
+  geoip: geoipStatusSchema,
 });
 export type Health = z.infer<typeof healthSchema>;
 
@@ -94,6 +101,9 @@ export const flowRowSchema = z.object({
    */
   txBytes: z.number().nonnegative().optional(),
   rxBytes: z.number().nonnegative().optional(),
+  /** Optional display labels (alias / cached resolve). Clicks still use raw IP. */
+  srcLabel: z.string().optional(),
+  dstLabel: z.string().optional(),
 });
 export type FlowRow = z.infer<typeof flowRowSchema>;
 
@@ -206,4 +216,9 @@ export function isLocalAddress(ip: string): boolean {
   if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
   if (lower.startsWith('fe80:')) return true;
   return false;
+}
+
+/** True when both ends of a flow are private/local addresses. */
+export function isLocalPair(src: string, dst: string): boolean {
+  return isLocalAddress(src) && isLocalAddress(dst);
 }

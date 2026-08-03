@@ -377,6 +377,14 @@ th {
   gap: 0.75rem;
 }
 
+.alias-block {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--theme-border) 85%, transparent);
+}
+
 .alias-row {
   display: flex;
   flex-wrap: wrap;
@@ -390,6 +398,81 @@ th {
   background: var(--theme-input-bg);
   color: var(--theme-text);
   padding: 0.4rem 0.6rem;
+}
+
+.copy-control {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+}
+
+.copy-btn.is-ok {
+  border-color: var(--theme-success-text);
+  color: var(--theme-success-text);
+}
+
+.copy-btn.is-err {
+  border-color: var(--theme-error-text);
+  color: var(--theme-error-text);
+}
+
+.clipboard-help {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 5;
+  width: min(22rem, 70vw);
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--theme-border);
+  background: var(--theme-modal-surface-bg);
+  box-shadow: var(--theme-shadow);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.clipboard-help p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--theme-text);
+  white-space: normal;
+}
+
+.th-sort {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+}
+
+.th-sort:hover,
+.th-sort.is-active {
+  color: var(--theme-text);
+}
+
+.app-footer {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.sha-link {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--theme-muted-text);
+  text-decoration: none;
+}
+
+a.sha-link:hover {
+  color: var(--theme-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 code {
