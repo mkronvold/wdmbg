@@ -360,7 +360,9 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(view.getAllByRole('columnheader', { name: 'Country' }).length).toBeGreaterThanOrEqual(2);
+      expect(view.getAllByRole('columnheader', { name: 'Country' }).length).toBeGreaterThanOrEqual(
+        2,
+      );
     });
     expect(view.getByRole('heading', { name: 'Top traffic by country' })).toBeInTheDocument();
 
