@@ -149,9 +149,9 @@ body {
 }
 
 /*
- * Dashboard boards: wide cards render outside multi-column containers.
- * Chromium multicol + column-span:all breaks packing for sibling non-wide panels,
- * so consecutive non-wide cards share a `.grid` and each wide card is a `.grid-wide`.
+ * Dashboard boards: wide cards render outside non-wide grid segments.
+ * Consecutive non-wide cards share a `.grid`; each wide card is a `.grid-wide` sibling.
+ * Do not use column-span:all — it breaks packing for sibling non-wide panels in Chromium.
  */
 .dashboard-boards {
   display: flex;
@@ -161,29 +161,31 @@ body {
 }
 
 /*
- * Masonry-style packing for non-wide dashboard cards only.
- * Multi-column lets short panels stack in a column beside a tall neighbor
- * (CSS Grid rows leave empty cells under short siblings).
- * Fill order is top-to-bottom per column, then left-to-right.
- * column-width ~ previous auto-fit minmax(30rem); collapses to 1 col on narrow viewports.
+ * Horizontal packing for non-wide dashboard cards (Chromium-safe).
+ * CSS multi-column + break-inside:avoid often leaves a second column empty when only
+ * a few tall panels are present; auto-fit grid places them side-by-side instead.
+ * minmax(min(100%, 30rem), 1fr) collapses to one column on narrow viewports.
  */
 .grid {
-  column-width: 30rem;
-  column-gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1rem;
+}
+
+.grid:last-child {
+  margin-bottom: 0;
 }
 
 .grid > .panel {
-  /* inline-block + break-inside keeps whole card in one column */
-  display: inline-block;
-  vertical-align: top;
-  width: 100%;
-  margin-bottom: 1rem;
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  page-break-inside: avoid;
+  display: block;
+  width: auto;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
-/* Full-width cards sit outside `.grid` so multicol packing stays intact. */
+/* Full-width cards sit outside `.grid` as siblings under `.dashboard-boards`. */
 .grid-wide {
   width: 100%;
 }
@@ -194,34 +196,10 @@ body {
   margin-bottom: 1rem;
 }
 
-/* Native masonry when available (Firefox); keeps horizontal-first flow closer to grid. */
+/* Native masonry when available (Firefox): denser vertical packing under short siblings. */
 @supports (grid-template-rows: masonry) {
   .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
     grid-template-rows: masonry;
-    gap: 1rem;
-    align-items: start;
-    column-width: auto;
-    column-gap: normal;
-  }
-
-  .grid > .panel {
-    display: block;
-    width: auto;
-    margin-bottom: 0;
-    break-inside: auto;
-    -webkit-column-break-inside: auto;
-    page-break-inside: auto;
-  }
-
-  /* Space between masonry grid segment and following wide/non-wide segment. */
-  .dashboard-boards > .grid {
-    margin-bottom: 1rem;
-  }
-
-  .dashboard-boards > .grid:last-child {
-    margin-bottom: 0;
   }
 }
 

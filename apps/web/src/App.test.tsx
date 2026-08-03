@@ -664,7 +664,7 @@ describe('App', () => {
     );
   });
 
-  it('renders wide cards outside multicol grids and keeps non-wide siblings together', async () => {
+  it('renders wide cards outside non-wide grids and keeps non-wide siblings together', async () => {
     localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['hotFlows']));
     const { container } = renderApp();
     const view = within(container);
@@ -674,17 +674,24 @@ describe('App', () => {
 
     const boards = container.querySelector('.dashboard-boards');
     expect(boards).toBeTruthy();
+    expect(boards?.parentElement).toBeTruthy();
 
     const flows = view.getByRole('heading', { name: 'Hot flows' }).closest('section')!;
     expect(flows).toHaveClass('is-wide-card');
     expect(flows.closest('.grid-wide')).toBeTruthy();
     expect(flows.closest('.grid')).toBeNull();
+    expect(boards?.contains(flows.closest('.grid-wide'))).toBe(true);
 
     const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
     const receivers = view.getByRole('heading', { name: 'Top receivers' }).closest('section')!;
-    expect(talkers.closest('.grid')).toBeTruthy();
-    expect(talkers.closest('.grid')).toBe(receivers.closest('.grid'));
-    expect(talkers.closest('.grid')).not.toBe(flows.closest('.grid-wide'));
+    const nonWideGrid = talkers.closest('.grid');
+    expect(nonWideGrid).toBeTruthy();
+    expect(nonWideGrid).toBe(receivers.closest('.grid'));
+    expect(nonWideGrid).not.toBe(flows.closest('.grid-wide'));
+    expect(boards?.contains(nonWideGrid)).toBe(true);
+    // Segments are direct children: .grid / .grid-wide under .dashboard-boards
+    expect(nonWideGrid?.parentElement).toBe(boards);
+    expect(flows.closest('.grid-wide')?.parentElement).toBe(boards);
   });
 
   it('persists table sort order and restores it on reload', async () => {
