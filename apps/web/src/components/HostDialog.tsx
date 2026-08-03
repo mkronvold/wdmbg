@@ -192,6 +192,7 @@ export function HostDialog({
             tableId="host-protocols"
             legend={legend}
             rows={summary.data.topProtocols}
+            defaultSortKey="b"
             columns={[
               {
                 key: 'p',
@@ -222,6 +223,7 @@ export function HostDialog({
             tableId="host-peers"
             legend={legend}
             rows={summary.data.topPeers}
+            defaultSortKey="rx"
             columns={[
               {
                 key: 'h',
@@ -279,6 +281,7 @@ export function HostDialog({
             tableId="host-flows"
             legend={legend}
             rows={flows.data.flows}
+            defaultSortKey="rxr"
             columns={[
               {
                 key: 'src',

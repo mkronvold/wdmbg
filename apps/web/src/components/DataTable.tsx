@@ -85,12 +85,19 @@ function saveTableSort(tableId: string, key: string | null, dir: SortDir) {
 function initialSortState(
   sortId: string | undefined,
   columns: { key: string }[],
+  defaultSortKey?: string,
+  defaultSortDir: SortDir = 'desc',
 ): { key: string | null; dir: SortDir } {
-  if (!sortId) return { key: null, dir: 'desc' };
-  const saved = loadTableSort(sortId);
-  if (!saved) return { key: null, dir: 'desc' };
-  if (!columns.some((c) => c.key === saved.key)) return { key: null, dir: 'desc' };
-  return { key: saved.key, dir: saved.dir };
+  if (sortId) {
+    const saved = loadTableSort(sortId);
+    if (saved && columns.some((c) => c.key === saved.key)) {
+      return { key: saved.key, dir: saved.dir };
+    }
+  }
+  if (defaultSortKey && columns.some((c) => c.key === defaultSortKey)) {
+    return { key: defaultSortKey, dir: defaultSortDir };
+  }
+  return { key: null, dir: 'desc' };
 }
 
 export interface DataTableProps<T> {
@@ -107,6 +114,13 @@ export interface DataTableProps<T> {
    * Dashboard cards typically omit this and use cardId; HostDialog tables pass explicit ids.
    */
   tableId?: string;
+  /**
+   * Initial sort when no saved wdmbg.tableSort entry exists for this table.
+   * Does not overwrite user preferences already stored in localStorage.
+   */
+  defaultSortKey?: string;
+  /** Direction for defaultSortKey (default desc). */
+  defaultSortDir?: SortDir;
   draggable?: boolean;
   /** Layout edit mode: show drag handle + hide/wide toggles; omit copy. */
   editMode?: boolean;
@@ -140,6 +154,8 @@ export function DataTable<T>({
   legend,
   cardId,
   tableId,
+  defaultSortKey,
+  defaultSortDir = 'desc',
   draggable = false,
   editMode = false,
   hidden = false,
@@ -155,7 +171,7 @@ export function DataTable<T>({
   onDragEnd,
 }: DataTableProps<T>) {
   const sortId = tableId ?? cardId;
-  const initial = initialSortState(sortId, columns);
+  const initial = initialSortState(sortId, columns, defaultSortKey, defaultSortDir);
   const [sortKey, setSortKey] = useState<string | null>(initial.key);
   const [sortDir, setSortDir] = useState<SortDir>(initial.dir);
 

@@ -605,6 +605,8 @@ export function App() {
         title="Traffic summary"
         legend={legend}
         rows={summaryRows}
+        defaultSortKey="b"
+        defaultSortDir="asc"
         {...cardChrome('trafficSummary')}
         columns={[
           {
@@ -612,7 +614,8 @@ export function App() {
             header: 'Bucket',
             width: 'primary',
             render: (r: SummaryRow) => r.bucket,
-            sortValue: (r: SummaryRow) => r.bucket,
+            // Keep Local before Internet (natural summary order).
+            sortValue: (r: SummaryRow) => (r.bucket === 'Local' ? 0 : 1),
           },
           {
             key: 'tx',
@@ -651,6 +654,7 @@ export function App() {
         title="Top talkers"
         legend={legend}
         rows={dashboard.data.topTalkers}
+        defaultSortKey="txr"
         {...cardChrome('topTalkers')}
         columns={[
           {
@@ -709,6 +713,7 @@ export function App() {
         title="Top receivers"
         legend={legend}
         rows={dashboard.data.topReceivers}
+        defaultSortKey="rxr"
         {...cardChrome('topReceivers')}
         columns={[
           {
@@ -767,6 +772,7 @@ export function App() {
         title="Top Local Talkers"
         legend={legend}
         rows={dashboard.data.topLocalTalkers}
+        defaultSortKey="txr"
         {...cardChrome('topLocalTalkers')}
         columns={[
           {
@@ -825,6 +831,7 @@ export function App() {
         title="Top Local Receivers"
         legend={legend}
         rows={dashboard.data.topLocalReceivers}
+        defaultSortKey="rxr"
         {...cardChrome('topLocalReceivers')}
         columns={[
           {
@@ -883,6 +890,7 @@ export function App() {
         title="Top protocols"
         legend={legend}
         rows={dashboard.data.topProtocols}
+        defaultSortKey="b"
         {...cardChrome('topProtocols')}
         columns={[
           {
@@ -911,9 +919,10 @@ export function App() {
     hotFlows: dashboard.data ? (
       <DataTable
         key="hotFlows"
-        title="Hot flows"
+        title="Bulk flows"
         legend={legend}
         rows={dashboard.data.hotFlows}
+        defaultSortKey="b"
         {...cardChrome('hotFlows')}
         columns={[
           {
