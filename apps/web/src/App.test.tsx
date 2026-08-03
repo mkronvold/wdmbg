@@ -213,13 +213,16 @@ describe('App', () => {
     await waitFor(() => {
       expect(dlg.getByRole('heading', { name: 'Totals' })).toBeInTheDocument();
     });
-    expect(dlg.getByRole('columnheader', { name: 'TX MB' })).toBeInTheDocument();
-    expect(dlg.getByRole('columnheader', { name: 'RX MB' })).toBeInTheDocument();
-    expect(dlg.getByRole('columnheader', { name: 'Total MB' })).toBeInTheDocument();
-    expect(dlg.getByRole('columnheader', { name: 'TX Mbps' })).toBeInTheDocument();
-    expect(dlg.getByRole('columnheader', { name: 'RX Mbps' })).toBeInTheDocument();
-    expect(dlg.queryByRole('columnheader', { name: 'Metric' })).not.toBeInTheDocument();
-    expect(dlg.queryByRole('columnheader', { name: 'Value' })).not.toBeInTheDocument();
+    const totalsPanel = dlg.getByRole('heading', { name: 'Totals' }).closest('section');
+    expect(totalsPanel).toBeTruthy();
+    const totals = within(totalsPanel as HTMLElement);
+    expect(totals.getByRole('columnheader', { name: 'TX MB' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'RX MB' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'Total MB' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'TX Mbps' })).toBeInTheDocument();
+    expect(totals.getByRole('columnheader', { name: 'RX Mbps' })).toBeInTheDocument();
+    expect(totals.queryByRole('columnheader', { name: 'Metric' })).not.toBeInTheDocument();
+    expect(totals.queryByRole('columnheader', { name: 'Value' })).not.toBeInTheDocument();
   });
 
   it('opens host details from hot flow Src/Dst IPs and deep-links', async () => {
