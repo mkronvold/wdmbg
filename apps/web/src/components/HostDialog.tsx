@@ -191,7 +191,12 @@ export function HostDialog({
             legend={legend}
             rows={summary.data.topProtocols}
             columns={[
-              { key: 'p', header: 'Protocol', render: (r: ProtocolRow) => r.protocol },
+              {
+                key: 'p',
+                header: 'Protocol',
+                width: 'primary',
+                render: (r: ProtocolRow) => r.protocol,
+              },
               {
                 key: 'b',
                 header: 'MB',
@@ -218,6 +223,7 @@ export function HostDialog({
               {
                 key: 'h',
                 header: 'Peer',
+                width: 'primary',
                 cellClassName: 'cell-host',
                 render: (r: TalkerRow) => hostLabel(r.host, r.label),
                 sortValue: (r: TalkerRow) => r.label ?? r.host,
@@ -256,6 +262,7 @@ export function HostDialog({
                     {
                       key: 'c',
                       header: 'Country',
+                      width: 'min' as const,
                       render: (r: TalkerRow) => r.country ?? '—',
                     },
                   ]
@@ -272,6 +279,7 @@ export function HostDialog({
               {
                 key: 'src',
                 header: 'Src',
+                width: 'min',
                 cellClassName: 'cell-host',
                 render: (r: FlowRow) => hostLabel(r.src, r.srcLabel),
                 sortValue: (r: FlowRow) => r.srcLabel ?? r.src,
@@ -287,6 +295,7 @@ export function HostDialog({
               {
                 key: 'dst',
                 header: 'Dst',
+                width: 'primary',
                 cellClassName: 'cell-host',
                 render: (r: FlowRow) => hostLabel(r.dst, r.dstLabel),
                 sortValue: (r: FlowRow) => r.dstLabel ?? r.dst,
@@ -299,8 +308,8 @@ export function HostDialog({
                 render: (r: FlowRow) => r.dstPort,
                 sortValue: (r: FlowRow) => r.dstPort,
               },
-              { key: 'l4', header: 'L4', render: (r: FlowRow) => r.l4 },
-              { key: 'l7', header: 'L7', render: (r: FlowRow) => r.l7 ?? '—' },
+              { key: 'l4', header: 'L4', width: 'min', render: (r: FlowRow) => r.l4 },
+              { key: 'l7', header: 'L7', width: 'min', render: (r: FlowRow) => r.l7 ?? '—' },
               {
                 key: 'tx',
                 header: 'TX MB',

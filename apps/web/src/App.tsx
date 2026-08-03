@@ -393,6 +393,7 @@ export function App() {
           {
             key: 'b',
             header: 'Bucket',
+            width: 'primary',
             render: (r: SummaryRow) => r.bucket,
             sortValue: (r: SummaryRow) => r.bucket,
           },
@@ -441,6 +442,7 @@ export function App() {
           {
             key: 'h',
             header: 'Host',
+            width: 'primary',
             cellClassName: 'cell-host',
             render: (r: TalkerRow) => hostLabel(r.host, r.label),
             sortValue: (r: TalkerRow) => r.label ?? r.host,
@@ -475,7 +477,14 @@ export function App() {
             sortValue: (r: TalkerRow) => r.rxBytes,
           },
           ...(geoipPresent
-            ? [{ key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' }]
+            ? [
+                {
+                  key: 'c',
+                  header: 'Country',
+                  width: 'min' as const,
+                  render: (r: TalkerRow) => r.country ?? '—',
+                },
+              ]
             : []),
         ]}
       />
@@ -494,6 +503,7 @@ export function App() {
           {
             key: 'h',
             header: 'Host',
+            width: 'primary',
             cellClassName: 'cell-host',
             render: (r: TalkerRow) => hostLabel(r.host, r.label),
             sortValue: (r: TalkerRow) => r.label ?? r.host,
@@ -528,7 +538,14 @@ export function App() {
             sortValue: (r: TalkerRow) => r.txBytes,
           },
           ...(geoipPresent
-            ? [{ key: 'c', header: 'Country', render: (r: TalkerRow) => r.country ?? '—' }]
+            ? [
+                {
+                  key: 'c',
+                  header: 'Country',
+                  width: 'min' as const,
+                  render: (r: TalkerRow) => r.country ?? '—',
+                },
+              ]
             : []),
         ]}
       />
@@ -544,7 +561,7 @@ export function App() {
         isDragOver={dragOverId === 'topProtocols'}
         {...dragProps}
         columns={[
-          { key: 'p', header: 'Protocol', render: (r: ProtocolRow) => r.protocol },
+          { key: 'p', header: 'Protocol', width: 'primary', render: (r: ProtocolRow) => r.protocol },
           {
             key: 'b',
             header: 'MB',
@@ -576,6 +593,7 @@ export function App() {
           {
             key: 'src',
             header: 'Src',
+            width: 'min',
             cellClassName: 'cell-host',
             render: (r: FlowRow) => hostLabel(r.src, r.srcLabel),
             sortValue: (r: FlowRow) => r.srcLabel ?? r.src,
@@ -591,6 +609,7 @@ export function App() {
           {
             key: 'dst',
             header: 'Dst',
+            width: 'primary',
             cellClassName: 'cell-host',
             render: (r: FlowRow) => hostLabel(r.dst, r.dstLabel),
             sortValue: (r: FlowRow) => r.dstLabel ?? r.dst,
@@ -603,8 +622,8 @@ export function App() {
             render: (r: FlowRow) => r.dstPort,
             sortValue: (r: FlowRow) => r.dstPort,
           },
-          { key: 'l4', header: 'L4', render: (r: FlowRow) => r.l4 },
-          { key: 'l7', header: 'L7', render: (r: FlowRow) => r.l7 ?? '—' },
+          { key: 'l4', header: 'L4', width: 'min', render: (r: FlowRow) => r.l4 },
+          { key: 'l7', header: 'L7', width: 'min', render: (r: FlowRow) => r.l7 ?? '—' },
           {
             key: 'b',
             header: 'MB',
@@ -641,7 +660,7 @@ export function App() {
           isDragOver={dragOverId === 'topCountries'}
           {...dragProps}
           columns={[
-            { key: 'c', header: 'Country', render: (r: CountryRow) => r.country },
+            { key: 'c', header: 'Country', width: 'primary', render: (r: CountryRow) => r.country },
             {
               key: 'b',
               header: 'MB',
