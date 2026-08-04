@@ -164,6 +164,14 @@ function renderApp() {
   );
 }
 
+function openSettings(view: ReturnType<typeof within>) {
+  const gear = view.getByRole('button', { name: 'Settings' });
+  if (gear.getAttribute('aria-expanded') !== 'true') {
+    fireEvent.click(gear);
+  }
+  return gear;
+}
+
 describe('App', () => {
   beforeEach(() => {
     cleanup();
@@ -213,6 +221,11 @@ describe('App', () => {
     const view = within(container);
     expect(view.getByRole('heading', { level: 1, name: 'WDMBG' })).toBeInTheDocument();
     expect(view.getByText('Where did my bandwidth go?')).toBeInTheDocument();
+    const gear = view.getByRole('button', { name: 'Settings' });
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
+    expect(view.queryByText('Traffic window')).not.toBeInTheDocument();
+    openSettings(view);
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
     expect(view.getByText('Traffic window')).toBeInTheDocument();
     expect(view.getByRole('group', { name: 'Traffic window' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: '30s' })).toBeInTheDocument();
@@ -534,6 +547,37 @@ describe('App', () => {
     expect(window.location.search).toContain('ip=8.8.8.8');
   });
 
+  it('toggles settings panel from the gear and persists open state', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    const gear = view.getByRole('button', { name: 'Settings' });
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
+    expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
+    expect(view.queryByRole('group', { name: 'Traffic window' })).not.toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
+
+    fireEvent.click(gear);
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
+    expect(view.getByLabelText('Color theme')).toBeInTheDocument();
+    expect(view.getByRole('group', { name: 'Traffic window' })).toBeInTheDocument();
+    expect(view.getByRole('combobox', { name: 'Display Refresh' })).toBeInTheDocument();
+    expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('1');
+
+    fireEvent.click(gear);
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
+    expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
+    expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('0');
+  });
+
+  it('restores settings open preference on load', async () => {
+    localStorage.setItem('wdmbg.dashboard.settingsOpen', '1');
+    const { container } = renderApp();
+    const view = within(container);
+    const gear = view.getByRole('button', { name: 'Settings' });
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
+    expect(view.getByLabelText('Color theme')).toBeInTheDocument();
+  });
+
   it('changes theme via select and persists preference', async () => {
     const { container } = renderApp();
     const view = within(container);
@@ -541,6 +585,7 @@ describe('App', () => {
       expect(document.documentElement.dataset.theme).toBe('midnight');
     });
 
+    openSettings(view);
     const select = view.getByRole('combobox', { name: 'Color theme' });
     fireEvent.change(select, { target: { value: 'ocean' } });
     expect(document.documentElement.dataset.theme).toBe('ocean');
@@ -559,6 +604,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe('light');
     });
+    openSettings(view);
     const select = view.getByRole('combobox', { name: 'Color theme' }) as HTMLSelectElement;
     expect(select.value).toBe('light');
   });
@@ -570,6 +616,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(document.documentElement.dataset.theme).toBe('midnight');
     });
+    openSettings(view);
     expect((view.getByRole('combobox', { name: 'Color theme' }) as HTMLSelectElement).value).toBe(
       'midnight',
     );
@@ -587,6 +634,7 @@ describe('App', () => {
     const callsAfterMount = vi.mocked(client.fetchDashboard).mock.calls.length;
     expect(callsAfterMount).toBeGreaterThan(0);
 
+    openSettings(view);
     const refresh = view.getByRole('combobox', { name: 'Display Refresh' });
     fireEvent.change(refresh, { target: { value: 'pause' } });
     expect(view.getByText('Paused')).toBeInTheDocument();
@@ -607,6 +655,7 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
 
+    openSettings(view);
     const toggle = view.getByRole('button', { name: 'Local Traffic Shown' });
     fireEvent.click(toggle);
     expect(view.getByRole('button', { name: 'Local Traffic Hidden' })).toBeInTheDocument();
@@ -623,6 +672,7 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
 
+    openSettings(view);
     const group = view.getByRole('group', { name: 'Traffic window' });
     fireEvent.click(within(group).getByRole('button', { name: '5m' }));
     expect(localStorage.getItem('wdmbg.trafficWindow')).toBe('5m');
@@ -638,6 +688,8 @@ describe('App', () => {
       expect(remountedView.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '5m')).toBe(true);
+    // Opening settings also restores the panel because toggle persisted open='1'.
+    openSettings(remountedView);
     expect(
       within(remountedView.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
         name: '5m',
@@ -653,6 +705,7 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '30s')).toBe(true);
+    openSettings(view);
     expect(
       within(view.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
         name: '30s',
@@ -667,6 +720,7 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
 
+    openSettings(view);
     expect(view.getByRole('button', { name: 'Resolve Name Auto' })).toBeInTheDocument();
     expect(localStorage.getItem(RESOLVE_NAME_KEY)).toBeNull();
 
@@ -685,6 +739,7 @@ describe('App', () => {
   it('persists Resolve Name Disabled when toggled off', async () => {
     const { container } = renderApp();
     const view = within(container);
+    openSettings(view);
     await waitFor(() => {
       expect(view.getByRole('button', { name: 'Resolve Name Auto' })).toBeInTheDocument();
     });
@@ -698,6 +753,7 @@ describe('App', () => {
     localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
     const { container } = renderApp();
     const view = within(container);
+    openSettings(view);
     await waitFor(() => {
       expect(view.getByRole('button', { name: 'Resolve Name Disabled' })).toBeInTheDocument();
     });
