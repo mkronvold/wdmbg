@@ -48,17 +48,60 @@ body {
 }
 
 .hero {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.title-row {
   display: flex;
-  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-end;
+  gap: 0.75rem;
 }
 
 .hero h1 {
   margin: 0.25rem 0;
   font-size: clamp(2.2rem, 5vw, 3.25rem);
   letter-spacing: 0.04em;
+}
+
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  margin-top: 0.35rem;
+  padding: 0;
+  border-radius: 0.45rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--theme-muted-text);
+  cursor: pointer;
+}
+
+.settings-toggle:hover {
+  color: var(--theme-text);
+  background: var(--theme-button-hover-bg);
+  border-color: var(--theme-border);
+}
+
+.settings-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--theme-focus-ring) 45%, transparent);
+  outline-offset: 1px;
+  border-color: var(--theme-accent);
+  color: var(--theme-chrome-text);
+}
+
+.settings-toggle.active {
+  color: var(--theme-chrome-text);
+  border-color: var(--theme-active-border);
+  background: color-mix(in srgb, var(--theme-accent) 22%, var(--theme-button-bg));
+}
+
+.settings-gear-icon {
+  display: block;
 }
 
 .eyebrow {
@@ -78,7 +121,7 @@ body {
 .hero-meta {
   display: grid;
   gap: 0.5rem;
-  justify-items: end;
+  justify-items: start;
 }
 
 .hero-controls {
@@ -86,7 +129,7 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .window-control,
@@ -849,11 +892,4 @@ code {
     max-width: 8rem;
   }
 
-  .hero-meta {
-    justify-items: start;
-  }
-
-  .hero-controls {
-    justify-content: flex-start;
-  }
 }
