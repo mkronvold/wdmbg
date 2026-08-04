@@ -287,6 +287,39 @@ body {
   background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
 }
 
+.card-order-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.card-order-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--theme-muted-text);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.card-order-btn:hover:not(:disabled) {
+  color: var(--theme-text);
+  background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+}
+
+.card-order-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .muted {
   color: var(--theme-muted-text);
 }
@@ -774,6 +807,11 @@ a.sha-link:hover {
   height: 100%;
   border: 0;
   background: transparent;
+}
+
+/* Keep iframe from stealing pointer events while reordering in edit mode. */
+.url-card-frame.is-edit-mode {
+  pointer-events: none;
 }
 
 .url-card-hint {

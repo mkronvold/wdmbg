@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reorderCards, segmentVisibleCards } from './cardOrder';
+import { moveCardStep, reorderCards, segmentVisibleCards } from './cardOrder';
 
 describe('reorderCards', () => {
   const order = ['a', 'b', 'c', 'd'] as const;
@@ -26,6 +26,53 @@ describe('reorderCards', () => {
     const input = [...order];
     expect(reorderCards(input, 'x', 'a')).toBe(input);
     expect(reorderCards(input, 'a', 'x')).toBe(input);
+  });
+});
+
+describe('moveCardStep', () => {
+  const order = ['trafficSummary', 'topTalkers', 'url:abc', 'topFlows'] as const;
+
+  it('moves a card one step earlier', () => {
+    expect(moveCardStep([...order], 'url:abc', 'up')).toEqual([
+      'trafficSummary',
+      'url:abc',
+      'topTalkers',
+      'topFlows',
+    ]);
+  });
+
+  it('moves a card one step later', () => {
+    expect(moveCardStep([...order], 'topTalkers', 'down')).toEqual([
+      'trafficSummary',
+      'url:abc',
+      'topTalkers',
+      'topFlows',
+    ]);
+  });
+
+  it('moves url card ids the same as built-in ids', () => {
+    expect(moveCardStep([...order], 'url:abc', 'down')).toEqual([
+      'trafficSummary',
+      'topTalkers',
+      'topFlows',
+      'url:abc',
+    ]);
+  });
+
+  it('returns same reference when already first and moving up', () => {
+    const input = [...order];
+    expect(moveCardStep(input, 'trafficSummary', 'up')).toBe(input);
+  });
+
+  it('returns same reference when already last and moving down', () => {
+    const input = [...order];
+    expect(moveCardStep(input, 'topFlows', 'down')).toBe(input);
+  });
+
+  it('returns same reference for unknown ids', () => {
+    const input = [...order];
+    expect(moveCardStep(input, 'missing', 'up')).toBe(input);
+    expect(moveCardStep(input, 'missing', 'down')).toBe(input);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   resolvedHeightRem,
   type UrlCardDef,
 } from '../urlCards';
+import { CardOrderControls } from './CardOrderControls';
 
 export interface UrlCardProps {
   def: UrlCardDef;
@@ -24,6 +25,10 @@ export interface UrlCardProps {
   onDragLeave?: (event: DragEvent<HTMLElement>, cardId: string) => void;
   onDrop?: (event: DragEvent<HTMLElement>, cardId: string) => void;
   onDragEnd?: (event: DragEvent<HTMLElement>) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
 export function UrlCard({
@@ -42,6 +47,10 @@ export function UrlCard({
   onDragLeave,
   onDrop,
   onDragEnd,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
 }: UrlCardProps) {
   const formId = useId();
   const [editing, setEditing] = useState(false);
@@ -130,16 +139,25 @@ export function UrlCard({
         <div className="panel-title-block">
           <div className="panel-title-row">
             {canDrag && (
-              <span
-                className="drag-handle"
-                title="Drag to reorder"
-                aria-label={`Drag to reorder ${def.title}`}
-                draggable
-                onDragStart={(e) => onDragStart?.(e, cardId)}
-                onDragEnd={onDragEnd}
-              >
-                ⋮⋮
-              </span>
+              <>
+                <span
+                  className="drag-handle"
+                  title="Drag to reorder"
+                  aria-label={`Drag to reorder ${def.title}`}
+                  draggable
+                  onDragStart={(e) => onDragStart?.(e, cardId)}
+                  onDragEnd={onDragEnd}
+                >
+                  ⋮⋮
+                </span>
+                <CardOrderControls
+                  title={def.title}
+                  canMoveUp={canMoveUp}
+                  canMoveDown={canMoveDown}
+                  onMoveUp={() => onMoveUp?.()}
+                  onMoveDown={() => onMoveDown?.()}
+                />
+              </>
             )}
             <h2>{def.title}</h2>
           </div>
@@ -290,7 +308,7 @@ export function UrlCard({
         <>
           <div className="url-card-frame-wrap" style={{ height: `${heightRem}rem` }}>
             <iframe
-              className="url-card-frame"
+              className={`url-card-frame${editMode ? ' is-edit-mode' : ''}`}
               title={def.title}
               src={def.url}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"

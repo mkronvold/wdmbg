@@ -1012,6 +1012,61 @@ describe('App', () => {
     expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]')).toEqual([]);
   });
 
+  it('moves built-in and URL cards with up/down controls and disables edges', async () => {
+    localStorage.setItem(
+      'wdmbg.dashboard.urlCards',
+      JSON.stringify([{ id: 'url:dash', title: 'Dash', url: 'https://dash.example.com' }]),
+    );
+    localStorage.setItem(
+      'wdmbg.dashboard.cardOrder',
+      JSON.stringify(['trafficSummary', 'topTalkers', 'url:dash', 'topReceivers']),
+    );
+
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Dash' })).toBeInTheDocument();
+    });
+
+    const readOrder = () =>
+      JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]') as string[];
+
+    expect(view.queryByRole('button', { name: 'Move Top talkers up' })).not.toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+
+    const firstUp = view.getByRole('button', { name: 'Move Traffic summary up' });
+    const firstDown = view.getByRole('button', { name: 'Move Traffic summary down' });
+    expect(firstUp).toBeDisabled();
+    expect(firstDown).not.toBeDisabled();
+
+    const urlFrame = view
+      .getByRole('heading', { name: 'Dash' })
+      .closest('section')!
+      .querySelector('iframe');
+    expect(urlFrame).toHaveClass('is-edit-mode');
+
+    fireEvent.click(view.getByRole('button', { name: 'Move Dash up' }));
+    let order = readOrder();
+    expect(order.indexOf('url:dash')).toBe(order.indexOf('topTalkers') - 1);
+
+    fireEvent.click(view.getByRole('button', { name: 'Move Dash up' }));
+    order = readOrder();
+    expect(order[0]).toBe('url:dash');
+    expect(view.getByRole('button', { name: 'Move Dash up' })).toBeDisabled();
+
+    fireEvent.click(view.getByRole('button', { name: 'Move Dash down' }));
+    order = readOrder();
+    expect(order.indexOf('url:dash')).toBe(order.indexOf('trafficSummary') + 1);
+
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    expect(view.queryByRole('button', { name: 'Move Dash up' })).not.toBeInTheDocument();
+    const viewFrame = view
+      .getByRole('heading', { name: 'Dash' })
+      .closest('section')!
+      .querySelector('iframe');
+    expect(viewFrame).not.toHaveClass('is-edit-mode');
+  });
+
   it('drops orphan url card refs and invalid defs on load', async () => {
     localStorage.setItem(
       'wdmbg.dashboard.urlCards',

@@ -1,4 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react';
+import { CardOrderControls } from './CardOrderControls';
 import { CopyButton } from './CopyButton';
 import { rowsToCsv, rowsToRich } from './tableCopy';
 
@@ -137,6 +138,10 @@ export interface DataTableProps<T> {
   onDragLeave?: (event: DragEvent<HTMLElement>, cardId: string) => void;
   onDrop?: (event: DragEvent<HTMLElement>, cardId: string) => void;
   onDragEnd?: (event: DragEvent<HTMLElement>) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
 function compareValues(a: string | number, b: string | number): number {
@@ -169,6 +174,10 @@ export function DataTable<T>({
   onDragLeave,
   onDrop,
   onDragEnd,
+  canMoveUp = false,
+  canMoveDown = false,
+  onMoveUp,
+  onMoveDown,
 }: DataTableProps<T>) {
   const sortId = tableId ?? cardId;
   const initial = initialSortState(sortId, columns, defaultSortKey, defaultSortDir);
@@ -244,16 +253,25 @@ export function DataTable<T>({
         <div className="panel-title-block">
           <div className="panel-title-row">
             {canDrag && (
-              <span
-                className="drag-handle"
-                title="Drag to reorder"
-                aria-label={`Drag to reorder ${title}`}
-                draggable
-                onDragStart={(e) => onDragStart?.(e, cardId!)}
-                onDragEnd={onDragEnd}
-              >
-                ⋮⋮
-              </span>
+              <>
+                <span
+                  className="drag-handle"
+                  title="Drag to reorder"
+                  aria-label={`Drag to reorder ${title}`}
+                  draggable
+                  onDragStart={(e) => onDragStart?.(e, cardId!)}
+                  onDragEnd={onDragEnd}
+                >
+                  ⋮⋮
+                </span>
+                <CardOrderControls
+                  title={title}
+                  canMoveUp={canMoveUp}
+                  canMoveDown={canMoveDown}
+                  onMoveUp={() => onMoveUp?.()}
+                  onMoveDown={() => onMoveDown?.()}
+                />
+              </>
             )}
             <h2>{title}</h2>
           </div>

@@ -25,7 +25,7 @@ import {
   saveResolveNameMode,
   type ResolveNameMode,
 } from './autoResolve';
-import { reorderCards, segmentVisibleCards } from './cardOrder';
+import { moveCardStep, reorderCards, segmentVisibleCards } from './cardOrder';
 import { DataTable } from './components/DataTable';
 import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './components/format';
 import { HostDialog } from './components/HostDialog';
@@ -583,22 +583,66 @@ export function App() {
     return map;
   }, [urlCards]);
 
-  const cardChrome = (cardId: DashboardCardId) => ({
-    cardId,
-    draggable: true as const,
-    editMode,
-    hidden: hiddenSet.has(cardId),
-    onToggleHidden: () => onToggleHidden(cardId),
-    wide: wideSet.has(cardId),
-    onToggleWide: () => onToggleWide(cardId),
-    isDragging: draggingId === cardId,
-    isDragOver: dragOverId === cardId,
-    onDragStart,
-    onDragOver,
-    onDragLeave,
-    onDrop,
-    onDragEnd,
-  });
+  const onMoveCard = useCallback(
+    (cardId: DashboardCardId, direction: 'up' | 'down') => {
+      setCardOrder((prev) => {
+        // Step within the same visible edit-mode list DnD uses (skip unavailable cards).
+        const editable = prev.filter((id) => {
+          if (id === 'topCountries' && !geoipPresent) return false;
+          if (isUrlCardId(id) && !urlCardById.has(id)) return false;
+          return true;
+        });
+        const moved = moveCardStep(editable, cardId, direction);
+        if (moved === editable) return prev;
+        const from = editable.indexOf(cardId);
+        const to = direction === 'up' ? from - 1 : from + 1;
+        const neighborId = editable[to];
+        if (!neighborId) return prev;
+        const i = prev.indexOf(cardId);
+        const j = prev.indexOf(neighborId);
+        if (i < 0 || j < 0) return prev;
+        const next = prev.slice();
+        next[i] = neighborId;
+        next[j] = cardId;
+        saveCardOrder(next);
+        return next;
+      });
+    },
+    [geoipPresent, urlCardById],
+  );
+
+  // Same list DnD / ↑↓ buttons use (includes hidden cards while editing).
+  const editOrderIds = useMemo(() => {
+    return cardOrder.filter((id) => {
+      if (id === 'topCountries' && !geoipPresent) return false;
+      if (isUrlCardId(id) && !urlCardById.has(id)) return false;
+      return true;
+    });
+  }, [cardOrder, geoipPresent, urlCardById]);
+
+  const cardChrome = (cardId: DashboardCardId) => {
+    const orderIndex = editOrderIds.indexOf(cardId);
+    return {
+      cardId,
+      draggable: true as const,
+      editMode,
+      hidden: hiddenSet.has(cardId),
+      onToggleHidden: () => onToggleHidden(cardId),
+      wide: wideSet.has(cardId),
+      onToggleWide: () => onToggleWide(cardId),
+      isDragging: draggingId === cardId,
+      isDragOver: dragOverId === cardId,
+      onDragStart,
+      onDragOver,
+      onDragLeave,
+      onDrop,
+      onDragEnd,
+      canMoveUp: orderIndex > 0,
+      canMoveDown: orderIndex >= 0 && orderIndex < editOrderIds.length - 1,
+      onMoveUp: () => onMoveCard(cardId, 'up'),
+      onMoveDown: () => onMoveCard(cardId, 'down'),
+    };
+  };
 
   const summaryRows: SummaryRow[] | null = dashboard.data?.summary
     ? [
@@ -1035,6 +1079,10 @@ export function App() {
           onDragLeave={chrome.onDragLeave}
           onDrop={chrome.onDrop}
           onDragEnd={chrome.onDragEnd}
+          canMoveUp={chrome.canMoveUp}
+          canMoveDown={chrome.canMoveDown}
+          onMoveUp={chrome.onMoveUp}
+          onMoveDown={chrome.onMoveDown}
           onUpdate={(patch) => onUpdateUrlCard(id, patch)}
           onDelete={() => onDeleteUrlCard(id)}
         />
