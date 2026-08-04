@@ -40,10 +40,12 @@ import {
 } from './theme';
 import {
   DEFAULT_URL_CARD_HEIGHT_REM,
+  DEFAULT_URL_CARD_SCALE,
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
   clampHeightRem,
   clampRefreshSec,
+  clampScale,
   filterKnownIds,
   isAllowedDashboardUrl,
   isUrlCardId,
@@ -532,10 +534,14 @@ export function App() {
   );
 
   const onUpdateUrlCard = useCallback(
-    (id: UrlCardId, patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec'>) => {
+    (
+      id: UrlCardId,
+      patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec' | 'scale'>,
+    ) => {
       if (!isAllowedDashboardUrl(patch.url)) return;
       const heightRem = clampHeightRem(patch.heightRem ?? DEFAULT_URL_CARD_HEIGHT_REM);
       const refreshSec = clampRefreshSec(patch.refreshSec);
+      const scale = clampScale(patch.scale);
       setUrlCards((prev) => {
         const next = prev.map((c) =>
           c.id === id
@@ -545,6 +551,7 @@ export function App() {
                 url: patch.url.trim(),
                 ...(heightRem !== DEFAULT_URL_CARD_HEIGHT_REM ? { heightRem } : {}),
                 ...(refreshSec > 0 ? { refreshSec } : {}),
+                ...(scale !== DEFAULT_URL_CARD_SCALE ? { scale } : {}),
               }
             : c,
         );

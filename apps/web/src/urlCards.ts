@@ -20,6 +20,18 @@ const ALLOWED_URL_CARD_REFRESH_SECS = new Set<number>(
   URL_CARD_REFRESH_OPTIONS.map((o) => o.sec).filter((s) => s > 0),
 );
 
+/** Per-card iframe content scale presets (omit / 1 = 100%). */
+export const DEFAULT_URL_CARD_SCALE = 1;
+export const URL_CARD_SCALE_OPTIONS = [
+  { scale: 0.5, label: '50%' },
+  { scale: 0.75, label: '75%' },
+  { scale: 1, label: '100%' },
+  { scale: 1.25, label: '125%' },
+  { scale: 1.5, label: '150%' },
+] as const;
+
+const ALLOWED_URL_CARD_SCALES = new Set<number>(URL_CARD_SCALE_OPTIONS.map((o) => o.scale));
+
 export type UrlCardId = `url:${string}`;
 
 export interface UrlCardDef {
@@ -30,6 +42,8 @@ export interface UrlCardDef {
   heightRem?: number;
   /** iframe auto-reload interval in seconds; omit or 0 = off */
   refreshSec?: number;
+  /** iframe content scale factor; omit or 1 = 100% */
+  scale?: number;
 }
 
 export function isUrlCardId(id: string): id is UrlCardId {
@@ -61,6 +75,17 @@ export function clampRefreshSec(value: unknown): number {
 
 export function resolvedRefreshSec(def: Pick<UrlCardDef, 'refreshSec'>): number {
   return def.refreshSec === undefined ? 0 : clampRefreshSec(def.refreshSec);
+}
+
+/** Normalize scale: only allow fixed presets; invalid → 1 (100%). */
+export function clampScale(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_URL_CARD_SCALE;
+  return ALLOWED_URL_CARD_SCALES.has(n) ? n : DEFAULT_URL_CARD_SCALE;
+}
+
+export function resolvedScale(def: Pick<UrlCardDef, 'scale'>): number {
+  return def.scale === undefined ? DEFAULT_URL_CARD_SCALE : clampScale(def.scale);
 }
 
 /** IPv4 private / loopback ranges used for http: allowance. */
@@ -133,6 +158,10 @@ function parseUrlCardDef(value: unknown): UrlCardDef | null {
   if (rec.refreshSec !== undefined) {
     const refreshSec = clampRefreshSec(rec.refreshSec);
     if (refreshSec > 0) def.refreshSec = refreshSec;
+  }
+  if (rec.scale !== undefined) {
+    const scale = clampScale(rec.scale);
+    if (scale !== DEFAULT_URL_CARD_SCALE) def.scale = scale;
   }
   return def;
 }

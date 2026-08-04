@@ -1,13 +1,17 @@
 import { useEffect, useId, useState, type DragEvent, type FormEvent } from 'react';
 import {
   DEFAULT_URL_CARD_HEIGHT_REM,
+  DEFAULT_URL_CARD_SCALE,
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
   URL_CARD_REFRESH_OPTIONS,
+  URL_CARD_SCALE_OPTIONS,
   clampRefreshSec,
+  clampScale,
   isAllowedDashboardUrl,
   resolvedHeightRem,
   resolvedRefreshSec,
+  resolvedScale,
   type UrlCardDef,
 } from '../urlCards';
 import { CardOrderControls } from './CardOrderControls';
@@ -19,7 +23,7 @@ export interface UrlCardProps {
   onToggleHidden?: () => void;
   wide?: boolean;
   onToggleWide?: () => void;
-  onUpdate?: (patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec'>) => void;
+  onUpdate?: (patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec' | 'scale'>) => void;
   onDelete?: () => void;
   isDragging?: boolean;
   isDragOver?: boolean;
@@ -62,11 +66,13 @@ export function UrlCard({
   const [urlDraft, setUrlDraft] = useState(def.url);
   const [heightDraft, setHeightDraft] = useState(String(resolvedHeightRem(def)));
   const [refreshDraft, setRefreshDraft] = useState(String(resolvedRefreshSec(def)));
+  const [scaleDraft, setScaleDraft] = useState(String(resolvedScale(def)));
   const [formError, setFormError] = useState<string | null>(null);
   const [frameKey, setFrameKey] = useState(0);
 
   const heightRem = resolvedHeightRem(def);
   const refreshSec = resolvedRefreshSec(def);
+  const scale = resolvedScale(def);
   const canDrag = Boolean(editMode);
   const cardId = def.id;
   const showFrame = !(editMode && editing);
@@ -99,6 +105,7 @@ export function UrlCard({
     setUrlDraft(def.url);
     setHeightDraft(String(resolvedHeightRem(def)));
     setRefreshDraft(String(resolvedRefreshSec(def)));
+    setScaleDraft(String(resolvedScale(def)));
     setFormError(null);
     setConfirmDelete(false);
     setEditing(true);
@@ -125,11 +132,13 @@ export function UrlCard({
     }
     const heightRaw = heightDraft.trim() === '' ? DEFAULT_URL_CARD_HEIGHT_REM : Number(heightDraft);
     const nextRefresh = clampRefreshSec(Number(refreshDraft));
+    const nextScale = clampScale(Number(scaleDraft));
     onUpdate?.({
       title,
       url,
       heightRem: Number.isFinite(heightRaw) ? heightRaw : DEFAULT_URL_CARD_HEIGHT_REM,
       refreshSec: nextRefresh > 0 ? nextRefresh : 0,
+      scale: nextScale !== DEFAULT_URL_CARD_SCALE ? nextScale : DEFAULT_URL_CARD_SCALE,
     });
     setEditing(false);
     setFormError(null);
@@ -336,6 +345,21 @@ export function UrlCard({
               ))}
             </select>
           </div>
+          <div className="url-card-form-row">
+            <label htmlFor={`${formId}-scale`}>Scale</label>
+            <select
+              id={`${formId}-scale`}
+              value={scaleDraft}
+              onChange={(e) => setScaleDraft(e.target.value)}
+              aria-label={`Scale for ${def.title}`}
+            >
+              {URL_CARD_SCALE_OPTIONS.map((opt) => (
+                <option key={opt.scale} value={String(opt.scale)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {formError ? (
             <p className="url-card-form-error" role="alert">
               {formError}
@@ -352,10 +376,14 @@ export function UrlCard({
         </form>
       ) : (
         <>
-          <div className="url-card-frame-wrap" style={{ height: `${heightRem}rem` }}>
+          <div
+            className="url-card-frame-wrap"
+            style={{ height: `${heightRem}rem`, ['--url-card-scale' as string]: String(scale) }}
+            data-scale={String(scale)}
+          >
             <iframe
               key={frameKey}
-              className={`url-card-frame${editMode ? ' is-edit-mode' : ''}`}
+              className={`url-card-frame${editMode ? ' is-edit-mode' : ''}${scale !== DEFAULT_URL_CARD_SCALE ? ' is-scaled' : ''}`}
               title={def.title}
               src={def.url}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
