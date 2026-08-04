@@ -119,7 +119,10 @@ export function topReceivers(flows: StoredFlow[], limit = 10, labels?: LabelLook
   return sortByBytesDesc([...buildHostStats(flows, labels).values()], (r) => r.rxBytes, limit);
 }
 
-/** Rank LAN hosts only by TX (after caller has applied filterFlows). */
+/**
+ * UI: "Top Talkers to Local". Ranks LAN hosts by TX after filterFlows.
+ * With excludeLocal, LAN↔LAN bytes are stripped so totals reflect non-local peers only.
+ */
 export function topLocalTalkers(
   flows: StoredFlow[],
   limit = 10,
@@ -129,7 +132,10 @@ export function topLocalTalkers(
   return sortByBytesDesc(local, (r) => r.txBytes, limit);
 }
 
-/** Rank LAN hosts only by RX (after caller has applied filterFlows). */
+/**
+ * UI: "Top Receivers from Local". Ranks LAN hosts by RX after filterFlows.
+ * With excludeLocal, LAN↔LAN bytes are stripped so totals reflect non-local peers only.
+ */
 export function topLocalReceivers(
   flows: StoredFlow[],
   limit = 10,

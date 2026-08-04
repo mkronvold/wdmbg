@@ -129,7 +129,7 @@ describe('aggregation', () => {
     );
   });
 
-  it('ranks only LAN hosts in top local talkers/receivers', () => {
+  it('ranks only LAN hosts in top talkers-to-local / receivers-from-local', () => {
     const store = new TrafficStore();
     const now = 1_800_000_000;
     seed(store, now);
