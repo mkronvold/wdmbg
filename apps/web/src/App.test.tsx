@@ -982,12 +982,24 @@ describe('App', () => {
     fireEvent.click(view.getByRole('button', { name: 'Edit Grafana' }));
     const editForm = view.getByRole('form', { name: 'Edit Grafana card' });
     fireEvent.change(within(editForm).getByLabelText('Refresh'), { target: { value: '60' } });
+    fireEvent.change(within(editForm).getByLabelText('Scale'), { target: { value: '0.5' } });
     fireEvent.click(within(editForm).getByRole('button', { name: 'Save' }));
     const storedRefresh = JSON.parse(
       localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]',
-    ) as Array<{ refreshSec?: number }>;
+    ) as Array<{ refreshSec?: number; scale?: number }>;
     expect(storedRefresh[0]?.refreshSec).toBe(60);
+    expect(storedRefresh[0]?.scale).toBe(0.5);
     fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    const scaledPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
+    const scaledWrap = scaledPanel.querySelector('.url-card-frame-wrap');
+    const scaledFrame = scaledPanel.querySelector('iframe');
+    expect(scaledWrap).toHaveAttribute('data-scale', '0.5');
+    expect(scaledFrame).toHaveClass('is-scaled');
+    // Pop-out stays full URL at 100% (scale is card chrome only).
+    expect(within(scaledPanel).getByRole('link', { name: 'Pop out Grafana' })).toHaveAttribute(
+      'href',
+      'https://grafana.example.com/d/x',
+    );
 
     unmount();
     const again = renderApp();

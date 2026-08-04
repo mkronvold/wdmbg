@@ -798,12 +798,14 @@ a.sha-link:hover {
 }
 
 .url-card-frame-wrap {
+  --url-card-scale: 1;
   width: 100%;
   min-height: 12rem;
   border-radius: 0.65rem;
   overflow: hidden;
   border: 1px solid var(--theme-border);
   background: color-mix(in srgb, var(--theme-bg) 80%, var(--theme-surface));
+  position: relative;
 }
 
 .url-card-frame {
@@ -812,6 +814,14 @@ a.sha-link:hover {
   height: 100%;
   border: 0;
   background: transparent;
+}
+
+/* Zoom iframe content via inverse size + CSS scale (more page visible when scale < 1). */
+.url-card-frame.is-scaled {
+  width: calc(100% / var(--url-card-scale));
+  height: calc(100% / var(--url-card-scale));
+  transform: scale(var(--url-card-scale));
+  transform-origin: top left;
 }
 
 /* Keep iframe from stealing pointer events while reordering in edit mode. */

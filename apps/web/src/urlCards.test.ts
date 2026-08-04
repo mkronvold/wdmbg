@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_URL_CARD_HEIGHT_REM,
+  DEFAULT_URL_CARD_SCALE,
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
   URL_CARDS_KEY,
   URL_CARD_REFRESH_OPTIONS,
+  URL_CARD_SCALE_OPTIONS,
   clampHeightRem,
   clampRefreshSec,
+  clampScale,
   filterKnownIds,
   isAllowedDashboardUrl,
   isLanIshHost,
@@ -16,6 +19,7 @@ import {
   mintUrlCardId,
   resolvedHeightRem,
   resolvedRefreshSec,
+  resolvedScale,
   saveUrlCards,
   type UrlCardDef,
 } from './urlCards';
@@ -83,6 +87,29 @@ describe('clampRefreshSec / resolvedRefreshSec', () => {
     for (const sec of allowed) {
       expect(clampRefreshSec(sec)).toBe(sec);
       expect(resolvedRefreshSec({ refreshSec: sec })).toBe(sec);
+    }
+  });
+});
+
+describe('clampScale / resolvedScale', () => {
+  it('defaults to 1 for missing or invalid values', () => {
+    expect(clampScale(undefined)).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(clampScale(null)).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(clampScale(Number.NaN)).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(clampScale('nope')).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(clampScale(0.6)).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(clampScale(2)).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(clampScale(0)).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(resolvedScale({})).toBe(DEFAULT_URL_CARD_SCALE);
+    expect(resolvedScale({ scale: 1 })).toBe(1);
+  });
+
+  it('accepts only the fixed preset set', () => {
+    const allowed = URL_CARD_SCALE_OPTIONS.map((o) => o.scale);
+    expect(allowed).toEqual([0.5, 0.75, 1, 1.25, 1.5]);
+    for (const scale of allowed) {
+      expect(clampScale(scale)).toBe(scale);
+      expect(resolvedScale({ scale })).toBe(scale);
     }
   });
 });
@@ -299,6 +326,82 @@ describe('loadUrlCards / saveUrlCards', () => {
     const raw = JSON.parse(localStorage.getItem(URL_CARDS_KEY) ?? '[]') as UrlCardDef[];
     expect(raw[0]).toMatchObject({ refreshSec: 30 });
     expect(raw[1]).not.toHaveProperty('refreshSec');
+  });
+
+  it('parses scale and defaults 100% when omitted or invalid', () => {
+    localStorage.setItem(
+      URL_CARDS_KEY,
+      JSON.stringify([
+        {
+          id: 'url:default',
+          title: 'Default',
+          url: 'https://example.com/default',
+        },
+        {
+          id: 'url:half',
+          title: 'Half',
+          url: 'https://example.com/half',
+          scale: 0.5,
+        },
+        {
+          id: 'url:full',
+          title: 'Full',
+          url: 'https://example.com/full',
+          scale: 1,
+        },
+        {
+          id: 'url:bad',
+          title: 'Bad',
+          url: 'https://example.com/bad',
+          scale: 0.6,
+        },
+      ]),
+    );
+    const loaded = loadUrlCards();
+    expect(loaded).toHaveLength(4);
+    expect(loaded[0]).toEqual({
+      id: 'url:default',
+      title: 'Default',
+      url: 'https://example.com/default',
+    });
+    expect(loaded[0]).not.toHaveProperty('scale');
+    expect(loaded[1]).toEqual({
+      id: 'url:half',
+      title: 'Half',
+      url: 'https://example.com/half',
+      scale: 0.5,
+    });
+    expect(loaded[2]).toEqual({
+      id: 'url:full',
+      title: 'Full',
+      url: 'https://example.com/full',
+    });
+    expect(loaded[2]).not.toHaveProperty('scale');
+    expect(loaded[3]).toEqual({
+      id: 'url:bad',
+      title: 'Bad',
+      url: 'https://example.com/bad',
+    });
+    expect(loaded[3]).not.toHaveProperty('scale');
+  });
+
+  it('persists scale only when not 100%', () => {
+    const scaled: UrlCardDef = {
+      id: 'url:s',
+      title: 'S',
+      url: 'https://s.example',
+      scale: 0.75,
+    };
+    const plain: UrlCardDef = {
+      id: 'url:p',
+      title: 'P',
+      url: 'https://p.example',
+    };
+    saveUrlCards([scaled, plain]);
+    expect(loadUrlCards()).toEqual([scaled, plain]);
+    const raw = JSON.parse(localStorage.getItem(URL_CARDS_KEY) ?? '[]') as UrlCardDef[];
+    expect(raw[0]).toMatchObject({ scale: 0.75 });
+    expect(raw[1]).not.toHaveProperty('scale');
   });
 });
 
