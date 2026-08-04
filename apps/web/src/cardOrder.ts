@@ -18,6 +18,26 @@ export function reorderCards<T extends string>(order: readonly T[], sourceId: T,
   return order as T[];
 }
 
+/**
+ * Move a card one step earlier (up) or later (down) in order.
+ * Returns the same array reference when the move is a no-op.
+ */
+export function moveCardStep<T extends string>(
+  order: readonly T[],
+  cardId: T,
+  direction: 'up' | 'down',
+): T[] {
+  const from = order.indexOf(cardId);
+  if (from < 0) return order as T[];
+  const to = direction === 'up' ? from - 1 : from + 1;
+  if (to < 0 || to >= order.length) return order as T[];
+  const next = order.slice() as T[];
+  const tmp = next[from]!;
+  next[from] = next[to]!;
+  next[to] = tmp;
+  return next;
+}
+
 /** Board segment: consecutive non-wide cards share one `.grid`. */
 export type CardSegment<T extends string> = { type: 'grid'; ids: T[] } | { type: 'wide'; id: T };
 
