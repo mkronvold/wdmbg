@@ -4,7 +4,9 @@ import {
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
   URL_CARDS_KEY,
+  URL_CARD_REFRESH_OPTIONS,
   clampHeightRem,
+  clampRefreshSec,
   filterKnownIds,
   isAllowedDashboardUrl,
   isLanIshHost,
@@ -13,6 +15,7 @@ import {
   mergeCardOrder,
   mintUrlCardId,
   resolvedHeightRem,
+  resolvedRefreshSec,
   saveUrlCards,
   type UrlCardDef,
 } from './urlCards';
@@ -57,6 +60,30 @@ describe('clampHeightRem / resolvedHeightRem', () => {
   it('resolvedHeightRem uses default when omitted', () => {
     expect(resolvedHeightRem({})).toBe(DEFAULT_URL_CARD_HEIGHT_REM);
     expect(resolvedHeightRem({ heightRem: 30 })).toBe(30);
+  });
+});
+
+describe('clampRefreshSec / resolvedRefreshSec', () => {
+  it('defaults Off for missing, zero, or invalid values', () => {
+    expect(clampRefreshSec(undefined)).toBe(0);
+    expect(clampRefreshSec(null)).toBe(0);
+    expect(clampRefreshSec(0)).toBe(0);
+    expect(clampRefreshSec(-1)).toBe(0);
+    expect(clampRefreshSec(Number.NaN)).toBe(0);
+    expect(clampRefreshSec('nope')).toBe(0);
+    expect(clampRefreshSec(7)).toBe(0);
+    expect(clampRefreshSec(45)).toBe(0);
+    expect(resolvedRefreshSec({})).toBe(0);
+    expect(resolvedRefreshSec({ refreshSec: 0 })).toBe(0);
+  });
+
+  it('accepts only the fixed option set', () => {
+    const allowed = URL_CARD_REFRESH_OPTIONS.map((o) => o.sec).filter((s) => s > 0);
+    expect(allowed).toEqual([10, 30, 60, 300, 900]);
+    for (const sec of allowed) {
+      expect(clampRefreshSec(sec)).toBe(sec);
+      expect(resolvedRefreshSec({ refreshSec: sec })).toBe(sec);
+    }
   });
 });
 
@@ -153,6 +180,7 @@ describe('loadUrlCards / saveUrlCards', () => {
       title: 'Grafana',
       url: 'https://grafana.example.com',
       heightRem: 30,
+      refreshSec: 60,
     };
     saveUrlCards([good]);
     expect(loadUrlCards()).toEqual([good]);
@@ -195,6 +223,82 @@ describe('loadUrlCards / saveUrlCards', () => {
       ]),
     );
     expect(loadUrlCards()[0]?.heightRem).toBe(MAX_URL_CARD_HEIGHT_REM);
+  });
+
+  it('parses refreshSec and defaults Off when omitted or invalid', () => {
+    localStorage.setItem(
+      URL_CARDS_KEY,
+      JSON.stringify([
+        {
+          id: 'url:off',
+          title: 'Off default',
+          url: 'https://example.com/off',
+        },
+        {
+          id: 'url:zero',
+          title: 'Zero',
+          url: 'https://example.com/zero',
+          refreshSec: 0,
+        },
+        {
+          id: 'url:ok',
+          title: 'Ok',
+          url: 'https://example.com/ok',
+          refreshSec: 300,
+        },
+        {
+          id: 'url:bad',
+          title: 'Bad',
+          url: 'https://example.com/bad',
+          refreshSec: 17,
+        },
+      ]),
+    );
+    const loaded = loadUrlCards();
+    expect(loaded).toHaveLength(4);
+    expect(loaded[0]).toEqual({
+      id: 'url:off',
+      title: 'Off default',
+      url: 'https://example.com/off',
+    });
+    expect(loaded[0]).not.toHaveProperty('refreshSec');
+    expect(loaded[1]).toEqual({
+      id: 'url:zero',
+      title: 'Zero',
+      url: 'https://example.com/zero',
+    });
+    expect(loaded[1]).not.toHaveProperty('refreshSec');
+    expect(loaded[2]).toEqual({
+      id: 'url:ok',
+      title: 'Ok',
+      url: 'https://example.com/ok',
+      refreshSec: 300,
+    });
+    expect(loaded[3]).toEqual({
+      id: 'url:bad',
+      title: 'Bad',
+      url: 'https://example.com/bad',
+    });
+    expect(loaded[3]).not.toHaveProperty('refreshSec');
+  });
+
+  it('persists refreshSec only when enabled', () => {
+    const withRefresh: UrlCardDef = {
+      id: 'url:r',
+      title: 'R',
+      url: 'https://r.example',
+      refreshSec: 30,
+    };
+    const without: UrlCardDef = {
+      id: 'url:n',
+      title: 'N',
+      url: 'https://n.example',
+    };
+    saveUrlCards([withRefresh, without]);
+    expect(loadUrlCards()).toEqual([withRefresh, without]);
+    const raw = JSON.parse(localStorage.getItem(URL_CARDS_KEY) ?? '[]') as UrlCardDef[];
+    expect(raw[0]).toMatchObject({ refreshSec: 30 });
+    expect(raw[1]).not.toHaveProperty('refreshSec');
   });
 });
 

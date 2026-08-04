@@ -966,10 +966,28 @@ describe('App', () => {
 
     fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
     const viewPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
+    const refreshBtn = within(viewPanel).getByRole('button', { name: 'Refresh Grafana' });
+    const iframeBefore = viewPanel.querySelector('iframe');
+    expect(iframeBefore).toBeTruthy();
+    fireEvent.click(refreshBtn);
+    const iframeAfter = viewPanel.querySelector('iframe');
+    expect(iframeAfter).toBeTruthy();
+    expect(iframeAfter).toHaveAttribute('src', 'https://grafana.example.com/d/x');
     const popout = within(viewPanel).getByRole('link', { name: 'Pop out Grafana' });
     expect(popout).toHaveAttribute('href', 'https://grafana.example.com/d/x');
     expect(popout).toHaveAttribute('target', '_blank');
     expect(popout).toHaveAttribute('rel', expect.stringContaining('noopener'));
+
+    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    fireEvent.click(view.getByRole('button', { name: 'Edit Grafana' }));
+    const editForm = view.getByRole('form', { name: 'Edit Grafana card' });
+    fireEvent.change(within(editForm).getByLabelText('Refresh'), { target: { value: '60' } });
+    fireEvent.click(within(editForm).getByRole('button', { name: 'Save' }));
+    const storedRefresh = JSON.parse(
+      localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]',
+    ) as Array<{ refreshSec?: number }>;
+    expect(storedRefresh[0]?.refreshSec).toBe(60);
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
 
     unmount();
     const again = renderApp();

@@ -672,7 +672,8 @@ a.sha-link:hover {
 
 .edit-card-btn,
 .delete-card-btn,
-.popout-btn {
+.popout-btn,
+.refresh-card-btn {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -694,7 +695,8 @@ a.sha-link:hover {
   line-height: 1;
 }
 
-.popout-btn {
+.popout-btn,
+.refresh-card-btn {
   width: 2rem;
   min-width: 2rem;
   padding: 0;
@@ -704,7 +706,8 @@ a.sha-link:hover {
 
 .edit-card-btn:hover,
 .delete-card-btn:hover,
-.popout-btn:hover {
+.popout-btn:hover,
+.refresh-card-btn:hover {
   color: var(--theme-text);
   border-color: color-mix(in srgb, var(--theme-accent) 40%, var(--theme-border));
 }
@@ -757,7 +760,8 @@ a.sha-link:hover {
   color: var(--theme-muted-text);
 }
 
-.url-card-form-row input {
+.url-card-form-row input,
+.url-card-form-row select {
   font: inherit;
   font-size: 0.9rem;
   padding: 0.4rem 0.55rem;
@@ -767,7 +771,8 @@ a.sha-link:hover {
   color: var(--theme-text);
 }
 
-.url-card-form-row input:focus {
+.url-card-form-row input:focus,
+.url-card-form-row select:focus {
   outline: 2px solid color-mix(in srgb, var(--theme-accent) 45%, transparent);
   outline-offset: 1px;
 }
