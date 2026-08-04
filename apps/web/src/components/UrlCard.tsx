@@ -1,10 +1,13 @@
-import { useId, useState, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useId, useState, type DragEvent, type FormEvent } from 'react';
 import {
   DEFAULT_URL_CARD_HEIGHT_REM,
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
+  URL_CARD_REFRESH_OPTIONS,
+  clampRefreshSec,
   isAllowedDashboardUrl,
   resolvedHeightRem,
+  resolvedRefreshSec,
   type UrlCardDef,
 } from '../urlCards';
 import { CardOrderControls } from './CardOrderControls';
@@ -16,7 +19,7 @@ export interface UrlCardProps {
   onToggleHidden?: () => void;
   wide?: boolean;
   onToggleWide?: () => void;
-  onUpdate?: (patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem'>) => void;
+  onUpdate?: (patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec'>) => void;
   onDelete?: () => void;
   isDragging?: boolean;
   isDragOver?: boolean;
@@ -58,11 +61,15 @@ export function UrlCard({
   const [titleDraft, setTitleDraft] = useState(def.title);
   const [urlDraft, setUrlDraft] = useState(def.url);
   const [heightDraft, setHeightDraft] = useState(String(resolvedHeightRem(def)));
+  const [refreshDraft, setRefreshDraft] = useState(String(resolvedRefreshSec(def)));
   const [formError, setFormError] = useState<string | null>(null);
+  const [frameKey, setFrameKey] = useState(0);
 
   const heightRem = resolvedHeightRem(def);
+  const refreshSec = resolvedRefreshSec(def);
   const canDrag = Boolean(editMode);
   const cardId = def.id;
+  const showFrame = !(editMode && editing);
 
   const panelClass = [
     'panel',
@@ -75,10 +82,23 @@ export function UrlCard({
     .filter(Boolean)
     .join(' ');
 
+  const reloadFrame = () => {
+    setFrameKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    if (!showFrame || refreshSec <= 0) return;
+    const id = window.setInterval(() => {
+      setFrameKey((k) => k + 1);
+    }, refreshSec * 1000);
+    return () => window.clearInterval(id);
+  }, [refreshSec, showFrame, def.url]);
+
   const openEdit = () => {
     setTitleDraft(def.title);
     setUrlDraft(def.url);
     setHeightDraft(String(resolvedHeightRem(def)));
+    setRefreshDraft(String(resolvedRefreshSec(def)));
     setFormError(null);
     setConfirmDelete(false);
     setEditing(true);
@@ -104,10 +124,12 @@ export function UrlCard({
       return;
     }
     const heightRaw = heightDraft.trim() === '' ? DEFAULT_URL_CARD_HEIGHT_REM : Number(heightDraft);
+    const nextRefresh = clampRefreshSec(Number(refreshDraft));
     onUpdate?.({
       title,
       url,
       heightRem: Number.isFinite(heightRaw) ? heightRaw : DEFAULT_URL_CARD_HEIGHT_REM,
+      refreshSec: nextRefresh > 0 ? nextRefresh : 0,
     });
     setEditing(false);
     setFormError(null);
@@ -238,6 +260,15 @@ export function UrlCard({
           </div>
         ) : (
           <div className="panel-actions">
+            <button
+              type="button"
+              className="refresh-card-btn copy-btn icon-btn"
+              title={`Refresh ${def.title}`}
+              aria-label={`Refresh ${def.title}`}
+              onClick={reloadFrame}
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
             <a
               className="popout-btn copy-btn icon-btn"
               href={def.url}
@@ -290,6 +321,21 @@ export function UrlCard({
               onChange={(e) => setHeightDraft(e.target.value)}
             />
           </div>
+          <div className="url-card-form-row">
+            <label htmlFor={`${formId}-refresh`}>Refresh</label>
+            <select
+              id={`${formId}-refresh`}
+              value={refreshDraft}
+              onChange={(e) => setRefreshDraft(e.target.value)}
+              aria-label={`Refresh interval for ${def.title}`}
+            >
+              {URL_CARD_REFRESH_OPTIONS.map((opt) => (
+                <option key={opt.sec} value={String(opt.sec)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
           {formError ? (
             <p className="url-card-form-error" role="alert">
               {formError}
@@ -308,6 +354,7 @@ export function UrlCard({
         <>
           <div className="url-card-frame-wrap" style={{ height: `${heightRem}rem` }}>
             <iframe
+              key={frameKey}
               className={`url-card-frame${editMode ? ' is-edit-mode' : ''}`}
               title={def.title}
               src={def.url}

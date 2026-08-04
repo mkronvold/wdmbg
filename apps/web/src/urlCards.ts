@@ -6,6 +6,20 @@ export const DEFAULT_URL_CARD_HEIGHT_REM = 24;
 export const MIN_URL_CARD_HEIGHT_REM = 12;
 export const MAX_URL_CARD_HEIGHT_REM = 80;
 
+/** Per-card iframe auto-reload intervals (0 / omit = off). */
+export const URL_CARD_REFRESH_OPTIONS = [
+  { sec: 0, label: 'Off' },
+  { sec: 10, label: '10s' },
+  { sec: 30, label: '30s' },
+  { sec: 60, label: '1m' },
+  { sec: 300, label: '5m' },
+  { sec: 900, label: '15m' },
+] as const;
+
+const ALLOWED_URL_CARD_REFRESH_SECS = new Set<number>(
+  URL_CARD_REFRESH_OPTIONS.map((o) => o.sec).filter((s) => s > 0),
+);
+
 export type UrlCardId = `url:${string}`;
 
 export interface UrlCardDef {
@@ -14,6 +28,8 @@ export interface UrlCardDef {
   url: string;
   /** iframe height in rem; default 24 */
   heightRem?: number;
+  /** iframe auto-reload interval in seconds; omit or 0 = off */
+  refreshSec?: number;
 }
 
 export function isUrlCardId(id: string): id is UrlCardId {
@@ -33,6 +49,18 @@ export function clampHeightRem(value: unknown): number {
 
 export function resolvedHeightRem(def: Pick<UrlCardDef, 'heightRem'>): number {
   return def.heightRem === undefined ? DEFAULT_URL_CARD_HEIGHT_REM : clampHeightRem(def.heightRem);
+}
+
+/** Normalize refreshSec: only allow the fixed option set; invalid / ≤0 → 0 (off). */
+export function clampRefreshSec(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const rounded = Math.round(n);
+  return ALLOWED_URL_CARD_REFRESH_SECS.has(rounded) ? rounded : 0;
+}
+
+export function resolvedRefreshSec(def: Pick<UrlCardDef, 'refreshSec'>): number {
+  return def.refreshSec === undefined ? 0 : clampRefreshSec(def.refreshSec);
 }
 
 /** IPv4 private / loopback ranges used for http: allowance. */
@@ -101,6 +129,10 @@ function parseUrlCardDef(value: unknown): UrlCardDef | null {
   };
   if (rec.heightRem !== undefined) {
     def.heightRem = clampHeightRem(rec.heightRem);
+  }
+  if (rec.refreshSec !== undefined) {
+    const refreshSec = clampRefreshSec(rec.refreshSec);
+    if (refreshSec > 0) def.refreshSec = refreshSec;
   }
   return def;
 }

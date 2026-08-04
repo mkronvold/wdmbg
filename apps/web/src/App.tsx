@@ -43,6 +43,7 @@ import {
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
   clampHeightRem,
+  clampRefreshSec,
   filterKnownIds,
   isAllowedDashboardUrl,
   isUrlCardId,
@@ -531,9 +532,10 @@ export function App() {
   );
 
   const onUpdateUrlCard = useCallback(
-    (id: UrlCardId, patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem'>) => {
+    (id: UrlCardId, patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec'>) => {
       if (!isAllowedDashboardUrl(patch.url)) return;
       const heightRem = clampHeightRem(patch.heightRem ?? DEFAULT_URL_CARD_HEIGHT_REM);
+      const refreshSec = clampRefreshSec(patch.refreshSec);
       setUrlCards((prev) => {
         const next = prev.map((c) =>
           c.id === id
@@ -542,6 +544,7 @@ export function App() {
                 title: patch.title.trim(),
                 url: patch.url.trim(),
                 ...(heightRem !== DEFAULT_URL_CARD_HEIGHT_REM ? { heightRem } : {}),
+                ...(refreshSec > 0 ? { refreshSec } : {}),
               }
             : c,
         );
