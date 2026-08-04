@@ -1,5 +1,7 @@
 # Probe (Go) — WDMBG delta
 
+> Public install path: [QUICKSTART.md](../QUICKSTART.md) · design: [DESIGN.md](../DESIGN.md).
+
 The probe is the main **delta** from a pure Node product-app monorepo in
 [`mkronvold/techstack`](https://github.com/mkronvold/techstack).
 

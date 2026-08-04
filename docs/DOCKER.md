@@ -1,5 +1,7 @@
 # Docker
 
+> Public install path: [QUICKSTART.md](../QUICKSTART.md) · design: [DESIGN.md](../DESIGN.md).
+
 Baseline: [`mkronvold/techstack` ci.md](https://github.com/mkronvold/techstack/blob/main/ci.md) (image rules).  
 Home host layout: [DEPLOY-HOME.md](./DEPLOY-HOME.md)  
 Probe is **not** containerized: [PROBE.md](./PROBE.md)

@@ -1,5 +1,7 @@
 # Home deployment (docker.lan)
 
+> Lab-specific checklist. **General public install:** [QUICKSTART.md](../QUICKSTART.md) · design: [DESIGN.md](../DESIGN.md).
+
 Baseline host rules: WSL `~/.promptlib/dockerhost-local.md`  
 Compose helpers: WSL `~/.promptlib/updown.md` + repo `deploy/compose/up.sh`  
 Container packaging notes: [DOCKER.md](./DOCKER.md)  
