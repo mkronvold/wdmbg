@@ -23,7 +23,9 @@ export interface UrlCardProps {
   onToggleHidden?: () => void;
   wide?: boolean;
   onToggleWide?: () => void;
-  onUpdate?: (patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec' | 'scale'>) => void;
+  onUpdate?: (
+    patch: Pick<UrlCardDef, 'title' | 'url' | 'heightRem' | 'refreshSec' | 'scale'>,
+  ) => void;
   onDelete?: () => void;
   isDragging?: boolean;
   isDragOver?: boolean;
