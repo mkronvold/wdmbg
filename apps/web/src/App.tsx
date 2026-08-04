@@ -879,7 +879,7 @@ export function App() {
     topLocalTalkers: dashboard.data ? (
       <DataTable
         key="topLocalTalkers"
-        title="Top Local Talkers"
+        title="Top Talkers to Local"
         legend={legend}
         rows={dashboard.data.topLocalTalkers}
         defaultSortKey="txr"
@@ -938,7 +938,7 @@ export function App() {
     topLocalReceivers: dashboard.data ? (
       <DataTable
         key="topLocalReceivers"
-        title="Top Local Receivers"
+        title="Top Receivers from Local"
         legend={legend}
         rows={dashboard.data.topLocalReceivers}
         defaultSortKey="rxr"

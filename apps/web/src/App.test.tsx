@@ -244,20 +244,22 @@ describe('App', () => {
     expect(view.getByRole('columnheader', { name: 'TX Rate' })).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'RX Rate' })).toBeInTheDocument();
     // Local talker/receiver cards are hidden on first load (edit mode still shows them dulled).
-    expect(view.queryByRole('heading', { name: 'Top Local Talkers' })).not.toBeInTheDocument();
-    expect(view.queryByRole('heading', { name: 'Top Local Receivers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top Talkers to Local' })).not.toBeInTheDocument();
+    expect(
+      view.queryByRole('heading', { name: 'Top Receivers from Local' }),
+    ).not.toBeInTheDocument();
     // Drag handles are edit-mode only
-    expect(view.queryByLabelText(/Drag to reorder Top talkers/i)).not.toBeInTheDocument();
+    expect(view.queryByLabelText('Drag to reorder Top talkers')).not.toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
     fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
-    expect(view.getByLabelText(/Drag to reorder Top talkers/i)).toBeInTheDocument();
+    expect(view.getByLabelText('Drag to reorder Top talkers')).toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Hide Top talkers' })).toBeInTheDocument();
-    expect(view.getByRole('heading', { name: 'Top Local Talkers' }).closest('section')).toHaveClass(
-      'is-hidden-card',
-    );
     expect(
-      view.getByRole('heading', { name: 'Top Local Receivers' }).closest('section'),
+      view.getByRole('heading', { name: 'Top Talkers to Local' }).closest('section'),
+    ).toHaveClass('is-hidden-card');
+    expect(
+      view.getByRole('heading', { name: 'Top Receivers from Local' }).closest('section'),
     ).toHaveClass('is-hidden-card');
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
@@ -297,8 +299,8 @@ describe('App', () => {
     for (const title of [
       'Top talkers',
       'Top receivers',
-      'Top Local Talkers',
-      'Top Local Receivers',
+      'Top Talkers to Local',
+      'Top Receivers from Local',
     ]) {
       const section = view.getByRole('heading', { name: title }).closest('section')!;
       const headers = within(section)
@@ -330,8 +332,8 @@ describe('App', () => {
 
     expectSort('Top talkers', /TX Mbps/, 'descending');
     expectSort('Top receivers', /RX Mbps/, 'descending');
-    expectSort('Top Local Talkers', /TX Mbps/, 'descending');
-    expectSort('Top Local Receivers', /RX Mbps/, 'descending');
+    expectSort('Top Talkers to Local', /TX Mbps/, 'descending');
+    expectSort('Top Receivers from Local', /RX Mbps/, 'descending');
     expectSort('Top protocols', /^MB/, 'descending');
     expectSort('Bulk flows', /^MB/, 'descending');
     expectSort('Traffic summary', /Bucket/, 'ascending');
@@ -347,8 +349,10 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     expect(view.getByRole('heading', { name: 'Top receivers' })).toBeInTheDocument();
-    expect(view.queryByRole('heading', { name: 'Top Local Talkers' })).not.toBeInTheDocument();
-    expect(view.queryByRole('heading', { name: 'Top Local Receivers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top Talkers to Local' })).not.toBeInTheDocument();
+    expect(
+      view.queryByRole('heading', { name: 'Top Receivers from Local' }),
+    ).not.toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.hiddenCards')).toBeNull();
   });
 
@@ -357,9 +361,9 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top Local Talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Top Talkers to Local' })).toBeInTheDocument();
     });
-    expect(view.getByRole('heading', { name: 'Top Local Receivers' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Receivers from Local' })).toBeInTheDocument();
   });
 
   it('applies HostDialog default sorts when no saved sort exists', async () => {
