@@ -1,5 +1,7 @@
 # proxbox1 probe deploy stubs
 
+> Public path (any capture host): [QUICKSTART.md](../../QUICKSTART.md). This page is the lab/`proxbox1` detail.
+
 Target: SSH host `proxbox1` (hostname `proxmox1`).
 
 ## Install sketch (manual)
