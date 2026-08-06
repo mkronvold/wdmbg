@@ -4,7 +4,11 @@ import { CopyButton } from './CopyButton';
 import { rowsToCsv, rowsToRich } from './tableCopy';
 
 export type SortDir = 'asc' | 'desc';
-export type VisualizationMode = 'bars' | 'lines';
+export type VisualizationMode = 'bars' | 'lines' | 'off';
+
+function isActiveVisualization(mode: VisualizationMode | undefined): mode is 'bars' | 'lines' {
+  return mode === 'bars' || mode === 'lines';
+}
 
 /** Column width packing: primary takes remaining space; share splits it; min shrinks. */
 export type ColumnWidth = 'primary' | 'share' | 'min' | 'auto';
@@ -126,6 +130,7 @@ export interface DataTableProps<T> {
   /**
    * Optional row visualization relative to the sum of the active sort column
    * (numeric columns only). Used on dashboard cards.
+   * `off` / omitted → no bars or underlines.
    */
   visualization?: VisualizationMode;
   draggable?: boolean;
@@ -202,7 +207,7 @@ export function DataTable<T>({
 
   /** Per-row share of the active numeric sort column total (0–100), or null when N/A. */
   const vizPercents = useMemo(() => {
-    if (!visualization || !sortKey) return null;
+    if (!isActiveVisualization(visualization) || !sortKey) return null;
     const col = columns.find((c) => c.key === sortKey);
     if (!col) return null;
     const pick = (row: T) => (col.sortValue ? col.sortValue(row) : col.render(row));
@@ -364,7 +369,7 @@ export function DataTable<T>({
             <tbody>
               {sortedRows.map((row, idx) => {
                 const pct = vizPercents?.[idx];
-                const showViz = pct != null && Boolean(visualization);
+                const showViz = pct != null && isActiveVisualization(visualization);
                 const rowClass = showViz ? `viz-row viz-${visualization}` : undefined;
                 const rowStyle = showViz
                   ? ({ ['--viz-pct' as string]: `${pct}%` } as CSSProperties)

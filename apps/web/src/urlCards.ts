@@ -46,6 +46,22 @@ export interface UrlCardDef {
   scale?: number;
 }
 
+/** Stable factory default URL card (first-run + Reset Layout). */
+export const DEFAULT_SPEEDIFY_URL_CARD_ID = 'url:speedify' as const;
+
+export const DEFAULT_SPEEDIFY_URL_CARD: UrlCardDef = {
+  id: DEFAULT_SPEEDIFY_URL_CARD_ID,
+  title: 'Speedify',
+  url: 'https://speedify.kronvold.org',
+  heightRem: 19,
+};
+
+export const DEFAULT_URL_CARDS: readonly UrlCardDef[] = [DEFAULT_SPEEDIFY_URL_CARD];
+
+export function factoryDefaultUrlCards(): UrlCardDef[] {
+  return DEFAULT_URL_CARDS.map((c) => ({ ...c }));
+}
+
 export function isUrlCardId(id: string): id is UrlCardId {
   return id.startsWith('url:') && id.length > 4;
 }
@@ -169,9 +185,10 @@ function parseUrlCardDef(value: unknown): UrlCardDef | null {
 export function loadUrlCards(): UrlCardDef[] {
   try {
     const raw = localStorage.getItem(URL_CARDS_KEY);
-    if (!raw) return [];
+    // Missing key only — empty [] is a saved "no URL cards" choice.
+    if (raw === null) return factoryDefaultUrlCards();
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) return factoryDefaultUrlCards();
     const seen = new Set<string>();
     const out: UrlCardDef[] = [];
     for (const item of parsed) {
@@ -182,7 +199,7 @@ export function loadUrlCards(): UrlCardDef[] {
     }
     return out;
   } catch {
-    return [];
+    return factoryDefaultUrlCards();
   }
 }
 

@@ -39,6 +39,7 @@ import {
   type ThemeId,
 } from './theme';
 import {
+  DEFAULT_SPEEDIFY_URL_CARD_ID,
   DEFAULT_URL_CARD_HEIGHT_REM,
   DEFAULT_URL_CARD_SCALE,
   MAX_URL_CARD_HEIGHT_REM,
@@ -46,6 +47,7 @@ import {
   clampHeightRem,
   clampRefreshSec,
   clampScale,
+  factoryDefaultUrlCards,
   filterKnownIds,
   isAllowedDashboardUrl,
   isUrlCardId,
@@ -69,17 +71,18 @@ const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 const TRAFFIC_WINDOW_KEY = 'wdmbg.trafficWindow';
 const VISUALIZATION_KEY = 'wdmbg.visualization';
 
-const VISUALIZATION_OPTIONS = ['bars', 'lines'] as const;
+const VISUALIZATION_OPTIONS = ['bars', 'lines', 'off'] as const;
 type VisualizationMode = (typeof VISUALIZATION_OPTIONS)[number];
 
+/** Builtin ids in factory visible-first order (hidden builtins follow). */
 const DEFAULT_CARD_ORDER = [
-  'trafficSummary',
-  'topTalkers',
-  'topReceivers',
   'topLocalTalkers',
   'topLocalReceivers',
-  'topProtocols',
+  'trafficSummary',
   'hotFlows',
+  'topTalkers',
+  'topReceivers',
+  'topProtocols',
   'topCountries',
 ] as const;
 
@@ -87,6 +90,22 @@ type SummaryRow = { bucket: 'Local' | 'Internet' } & TrafficBucket;
 
 type BuiltinCardId = (typeof DEFAULT_CARD_ORDER)[number];
 type DashboardCardId = BuiltinCardId | UrlCardId;
+
+/**
+ * First-run / Reset Layout board order, including the stable Speedify URL card.
+ * Visible grid: local pair | Speedify + summary | hotFlows wide.
+ */
+const FACTORY_CARD_ORDER: readonly string[] = [
+  'topLocalTalkers',
+  'topLocalReceivers',
+  DEFAULT_SPEEDIFY_URL_CARD_ID,
+  'trafficSummary',
+  'hotFlows',
+  'topTalkers',
+  'topReceivers',
+  'topProtocols',
+  'topCountries',
+];
 
 const DISPLAY_REFRESH_OPTIONS = [
   { id: 'pause', label: 'Pause', ms: null as number | null },
@@ -111,11 +130,10 @@ function readJsonLocal(key: string): unknown {
 }
 
 function loadCardOrder(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
-  return mergeCardOrder(
-    readJsonLocal(CARD_ORDER_KEY),
-    DEFAULT_CARD_ORDER,
-    urlCards,
-  ) as DashboardCardId[];
+  const raw = readJsonLocal(CARD_ORDER_KEY);
+  // Missing key → factory order (Speedify slotted between local pair and summary).
+  const stored = raw === null ? FACTORY_CARD_ORDER : raw;
+  return mergeCardOrder(stored, DEFAULT_CARD_ORDER, urlCards) as DashboardCardId[];
 }
 
 function saveCardOrder(order: DashboardCardId[]) {
@@ -126,18 +144,21 @@ function saveCardOrder(order: DashboardCardId[]) {
   }
 }
 
-function loadIdList(key: string, urlCards: readonly UrlCardDef[]): DashboardCardId[] {
-  const known = knownDashboardIds(DEFAULT_CARD_ORDER, urlCards);
-  return filterKnownIds(readJsonLocal(key), known) as DashboardCardId[];
-}
-
 /** First-run hidden cards when wdmbg.dashboard.hiddenCards is unset. */
-const DEFAULT_HIDDEN_CARDS: BuiltinCardId[] = ['topLocalTalkers', 'topLocalReceivers'];
+const DEFAULT_HIDDEN_CARDS: BuiltinCardId[] = [
+  'topTalkers',
+  'topReceivers',
+  'topProtocols',
+  'topCountries',
+];
+
+/** First-run wide cards when wdmbg.dashboard.wideCards is unset. */
+const DEFAULT_WIDE_CARDS: BuiltinCardId[] = ['hotFlows'];
 
 function loadHiddenCards(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
   const known = knownDashboardIds(DEFAULT_CARD_ORDER, urlCards);
   const raw = readJsonLocal(HIDDEN_CARDS_KEY);
-  // Missing/invalid pref only — empty [] is a saved "show all" choice.
+  // Missing pref only — empty [] is a saved "show all" choice.
   if (raw === null) {
     return DEFAULT_HIDDEN_CARDS.filter((id) => known.has(id)) as DashboardCardId[];
   }
@@ -153,7 +174,13 @@ function saveHiddenCards(ids: DashboardCardId[]) {
 }
 
 function loadWideCards(urlCards: readonly UrlCardDef[]): DashboardCardId[] {
-  return loadIdList(WIDE_CARDS_KEY, urlCards);
+  const known = knownDashboardIds(DEFAULT_CARD_ORDER, urlCards);
+  const raw = readJsonLocal(WIDE_CARDS_KEY);
+  // Missing pref only — empty [] is a saved "no wide cards" choice.
+  if (raw === null) {
+    return DEFAULT_WIDE_CARDS.filter((id) => known.has(id)) as DashboardCardId[];
+  }
+  return filterKnownIds(raw, known) as DashboardCardId[];
 }
 
 function saveWideCards(ids: DashboardCardId[]) {
@@ -379,6 +406,36 @@ export function App() {
       saveSettingsOpen(next);
       return next;
     });
+  }, []);
+
+  /**
+   * Reset Layout: restore factory defaults immediately to React state + localStorage
+   * (so a mid-edit refresh stays consistent). Stays in editMode for further tweaks.
+   */
+  const onResetLayout = useCallback(() => {
+    const nextUrlCards = factoryDefaultUrlCards();
+    const nextOrder = mergeCardOrder(
+      FACTORY_CARD_ORDER,
+      DEFAULT_CARD_ORDER,
+      nextUrlCards,
+    ) as DashboardCardId[];
+    const nextHidden = DEFAULT_HIDDEN_CARDS.filter((id) =>
+      knownDashboardIds(DEFAULT_CARD_ORDER, nextUrlCards).has(id),
+    ) as DashboardCardId[];
+    const nextWide = DEFAULT_WIDE_CARDS.filter((id) =>
+      knownDashboardIds(DEFAULT_CARD_ORDER, nextUrlCards).has(id),
+    ) as DashboardCardId[];
+
+    setUrlCards(nextUrlCards);
+    saveUrlCards(nextUrlCards);
+    setCardOrder(nextOrder);
+    saveCardOrder(nextOrder);
+    setHiddenCards(nextHidden);
+    saveHiddenCards(nextHidden);
+    setWideCards(nextWide);
+    saveWideCards(nextWide);
+    setAddingUrlCard(false);
+    setAddError(null);
   }, []);
 
   useEffect(() => {
@@ -912,10 +969,10 @@ export function App() {
     topLocalTalkers: dashboard.data ? (
       <DataTable
         key="topLocalTalkers"
-        title="Top Talkers to Local"
+        title="Top Receivers from Internet"
         legend={legend}
         rows={dashboard.data.topLocalTalkers}
-        defaultSortKey="txr"
+        defaultSortKey="rxr"
         visualization={visualization}
         {...cardChrome('topLocalTalkers')}
         columns={[
@@ -972,10 +1029,10 @@ export function App() {
     topLocalReceivers: dashboard.data ? (
       <DataTable
         key="topLocalReceivers"
-        title="Top Receivers from Local"
+        title="Top Talkers to Internet"
         legend={legend}
         rows={dashboard.data.topLocalReceivers}
-        defaultSortKey="rxr"
+        defaultSortKey="txr"
         visualization={visualization}
         {...cardChrome('topLocalReceivers')}
         columns={[
@@ -1205,16 +1262,28 @@ export function App() {
             <h1>WDMBG</h1>
             <p className="subtitle">Where did my bandwidth go?</p>
           </div>
-          <button
-            type="button"
-            className={`settings-toggle${settingsOpen ? ' active' : ''}`}
-            aria-label="Settings"
-            aria-expanded={settingsOpen}
-            aria-controls="settings-panel"
-            onClick={toggleSettings}
-          >
-            <GearIcon />
-          </button>
+          <div className="title-row-actions">
+            {editMode && !settingsOpen ? (
+              <button
+                type="button"
+                className="primary"
+                aria-label="Save Layout"
+                onClick={() => setEditMode(false)}
+              >
+                Save Layout
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`settings-toggle${settingsOpen ? ' active' : ''}`}
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              aria-controls="settings-panel"
+              onClick={toggleSettings}
+            >
+              <GearIcon />
+            </button>
+          </div>
         </div>
         <div className="hero-meta">
           {settingsOpen ? (
@@ -1330,6 +1399,33 @@ export function App() {
                   ))}
                 </div>
               </div>
+              <div className="window-control">
+                <p className="window-label">Edit Layout</p>
+                <button
+                  type="button"
+                  className={editMode ? 'primary' : 'copy-btn'}
+                  aria-pressed={editMode}
+                  aria-label={editMode ? 'Save Layout' : 'Edit Layout'}
+                  title={editMode ? 'Save Layout' : 'Edit Layout'}
+                  onClick={() => setEditMode((v) => !v)}
+                >
+                  {editMode ? 'Save Layout' : 'Edit Layout'}
+                </button>
+              </div>
+              {editMode ? (
+                <div className="window-control">
+                  <p className="window-label">Reset Layout</p>
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    aria-label="Reset Layout"
+                    title="Reset layout to factory defaults"
+                    onClick={onResetLayout}
+                  >
+                    Reset Layout
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : null}
           <p className="muted small">
@@ -1471,15 +1567,6 @@ export function App() {
         ) : (
           <span className="sha-link muted">{sha.short}</span>
         )}
-        <button
-          type="button"
-          className="footer-edit-link"
-          aria-pressed={editMode}
-          aria-label={editMode ? 'Done editing layout' : 'Edit layout'}
-          onClick={() => setEditMode((v) => !v)}
-        >
-          {editMode ? 'Done' : 'Edit'}
-        </button>
       </footer>
     </div>
   );

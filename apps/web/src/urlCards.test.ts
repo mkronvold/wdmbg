@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_SPEEDIFY_URL_CARD,
+  DEFAULT_SPEEDIFY_URL_CARD_ID,
   DEFAULT_URL_CARD_HEIGHT_REM,
   DEFAULT_URL_CARD_SCALE,
+  DEFAULT_URL_CARDS,
   MAX_URL_CARD_HEIGHT_REM,
   MIN_URL_CARD_HEIGHT_REM,
   URL_CARDS_KEY,
@@ -10,6 +13,7 @@ import {
   clampHeightRem,
   clampRefreshSec,
   clampScale,
+  factoryDefaultUrlCards,
   filterKnownIds,
   isAllowedDashboardUrl,
   isLanIshHost,
@@ -193,11 +197,18 @@ describe('loadUrlCards / saveUrlCards', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns empty when missing or invalid', () => {
-    expect(loadUrlCards()).toEqual([]);
+  it('returns factory Speedify card when missing or invalid', () => {
+    expect(loadUrlCards()).toEqual(factoryDefaultUrlCards());
+    expect(loadUrlCards()[0]).toEqual(DEFAULT_SPEEDIFY_URL_CARD);
+    expect(DEFAULT_URL_CARDS[0]?.id).toBe(DEFAULT_SPEEDIFY_URL_CARD_ID);
     localStorage.setItem(URL_CARDS_KEY, '{');
-    expect(loadUrlCards()).toEqual([]);
+    expect(loadUrlCards()).toEqual(factoryDefaultUrlCards());
     localStorage.setItem(URL_CARDS_KEY, '"x"');
+    expect(loadUrlCards()).toEqual(factoryDefaultUrlCards());
+  });
+
+  it('respects a saved empty urlCards list', () => {
+    localStorage.setItem(URL_CARDS_KEY, '[]');
     expect(loadUrlCards()).toEqual([]);
   });
 

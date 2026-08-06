@@ -33,7 +33,13 @@ const columns = [
 describe('DataTable visualization', () => {
   it('sets --viz-pct from share of numeric sort-column total', () => {
     const { container } = render(
-      <DataTable title="Demo" rows={rows} columns={columns} defaultSortKey="b" visualization="bars" />,
+      <DataTable
+        title="Demo"
+        rows={rows}
+        columns={columns}
+        defaultSortKey="b"
+        visualization="bars"
+      />,
     );
     const table = container.querySelector('table')!;
     const bodyRows = table.querySelectorAll('tbody tr.viz-row.viz-bars');
@@ -60,7 +66,13 @@ describe('DataTable visualization', () => {
 
   it('omits visualization when sorted by a non-numeric column', () => {
     const { container } = render(
-      <DataTable title="Demo" rows={rows} columns={columns} defaultSortKey="b" visualization="bars" />,
+      <DataTable
+        title="Demo"
+        rows={rows}
+        columns={columns}
+        defaultSortKey="b"
+        visualization="bars"
+      />,
     );
     fireEvent.click(within(container).getByRole('button', { name: 'Sort by Name' }));
     expect(container.querySelector('tbody tr.viz-row')).toBeNull();
@@ -71,5 +83,20 @@ describe('DataTable visualization', () => {
       <DataTable title="Demo" rows={rows} columns={columns} defaultSortKey="b" />,
     );
     expect(container.querySelector('tbody tr.viz-row')).toBeNull();
+  });
+
+  it('omits visualization when mode is off', () => {
+    const { container } = render(
+      <DataTable
+        title="Demo"
+        rows={rows}
+        columns={columns}
+        defaultSortKey="b"
+        visualization="off"
+      />,
+    );
+    expect(container.querySelector('tbody tr.viz-row')).toBeNull();
+    expect(container.querySelector('tbody tr.viz-bars')).toBeNull();
+    expect(container.querySelector('tbody tr.viz-lines')).toBeNull();
   });
 });
