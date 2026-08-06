@@ -74,28 +74,29 @@ func NewSecondAggregator() *SecondAggregator {
 }
 
 // Observe records a unidirectional packet from src->dst.
-func (a *SecondAggregator) Observe(ts time.Time, src, dst string, srcPort, dstPort uint16, l4 L4, l7 string, bytes uint64) {
+// When the packet belongs to a newer second than the open bucket, the previous
+// second is closed and returned so callers never drop boundary traffic.
+func (a *SecondAggregator) Observe(ts time.Time, src, dst string, srcPort, dstPort uint16, l4 L4, l7 string, bytes uint64) []Bucket {
 	if bytes == 0 {
-		return
+		return nil
 	}
 	sec := ts.Unix()
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	var closed []Bucket
 	if a.current == 0 {
 		a.current = sec
 	}
 	// Drop packets for older seconds; caller should Flush on tick.
 	if sec < a.current {
-		return
+		return nil
 	}
 	if sec > a.current {
-		// Should not accumulate future without flush; fold into current map only if empty advance
-		if len(a.flows) == 0 {
-			a.current = sec
-		} else if sec > a.current {
-			// ignore far-future until flush
-			return
+		if len(a.flows) > 0 {
+			closed = []Bucket{a.snapshotLocked()}
+			a.flows = make(map[string]*flowState)
 		}
+		a.current = sec
 	}
 	key, dirForward := canonicalize(src, dst, srcPort, dstPort, l4, l7)
 	id := key.String()
@@ -111,6 +112,7 @@ func (a *SecondAggregator) Observe(ts time.Time, src, dst string, srcPort, dstPo
 		st.BytesDstToSrc += bytes
 		st.PacketsDstToSrc++
 	}
+	return closed
 }
 
 func canonicalize(src, dst string, srcPort, dstPort uint16, l4 L4, l7 string) (FlowKey, bool) {

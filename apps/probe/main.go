@@ -59,10 +59,25 @@ func main() {
 		fmt.Fprintf(os.Stderr, "wdmbg-probe %s capture %s → %s\n", version, *iface, *ingestURL)
 	}
 
-	packets := make(chan capture.Packet, 4096)
+	// Large buffer so brief export latency does not stall pcap under multi-Gbps load.
+	packets := make(chan capture.Packet, 65536)
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- src.Run(ctx, packets)
+	}()
+
+	// Export off the capture path: blocking HTTP must never stall packet Observe.
+	// HTTP client already has its own timeout; use Background so shutdown can
+	// drain the queue without cancelling in-flight posts mid-retry.
+	exportCh := make(chan []aggregate.Bucket, 64)
+	exportDone := make(chan struct{})
+	go func() {
+		defer close(exportDone)
+		for batch := range exportCh {
+			if err := client.PostBuckets(context.Background(), batch); err != nil {
+				fmt.Fprintf(os.Stderr, "ingest error: %v\n", err)
+			}
+		}
 	}()
 
 	flushEvery := time.Duration(*interval) * time.Second
@@ -70,18 +85,24 @@ func main() {
 	defer ticker.Stop()
 
 	pending := make([]aggregate.Bucket, 0, 8)
-	flush := func() {
-		now := time.Now().Unix()
-		closed := agg.FlushClosed(now)
-		pending = append(pending, closed...)
+	tryExport := func() {
 		if len(pending) == 0 {
 			return
 		}
-		if err := client.PostBuckets(ctx, pending); err != nil {
-			fmt.Fprintf(os.Stderr, "ingest error: %v\n", err)
+		batch := pending
+		select {
+		case exportCh <- batch:
+			pending = make([]aggregate.Bucket, 0, 8)
+		default:
+			// Exporter busy; keep pending and retry on next tick/packet batch.
+		}
+	}
+	enqueue := func(buckets []aggregate.Bucket) {
+		if len(buckets) == 0 {
 			return
 		}
-		pending = pending[:0]
+		pending = append(pending, buckets...)
+		tryExport()
 	}
 
 	if *once {
@@ -97,7 +118,7 @@ func main() {
 				fmt.Println("simulate once complete")
 				return
 			case pkt := <-packets:
-				handlePacket(agg, pkt)
+				enqueue(handlePacket(agg, pkt))
 			case err := <-errCh:
 				if err != nil && ctx.Err() == nil {
 					fmt.Fprintf(os.Stderr, "capture error: %v\n", err)
@@ -111,7 +132,11 @@ func main() {
 		select {
 		case <-ctx.Done():
 			pending = append(pending, agg.ForceFlush()...)
-			_ = client.PostBuckets(context.Background(), pending)
+			close(exportCh)
+			<-exportDone
+			if len(pending) > 0 {
+				_ = client.PostBuckets(context.Background(), pending)
+			}
 			return
 		case err := <-errCh:
 			if err != nil && ctx.Err() == nil {
@@ -119,19 +144,20 @@ func main() {
 				os.Exit(1)
 			}
 		case pkt := <-packets:
-			handlePacket(agg, pkt)
+			enqueue(handlePacket(agg, pkt))
 		case <-ticker.C:
-			flush()
+			enqueue(agg.FlushClosed(time.Now().Unix()))
+			tryExport()
 		}
 	}
 }
 
-func handlePacket(agg *aggregate.SecondAggregator, pkt capture.Packet) {
+func handlePacket(agg *aggregate.SecondAggregator, pkt capture.Packet) []aggregate.Bucket {
 	l7 := aggregate.GuessL7(pkt.DstPort, pkt.L4)
 	if l7 == "" {
 		l7 = aggregate.GuessL7(pkt.SrcPort, pkt.L4)
 	}
-	agg.Observe(pkt.Ts, pkt.Src, pkt.Dst, pkt.SrcPort, pkt.DstPort, pkt.L4, l7, pkt.Bytes)
+	return agg.Observe(pkt.Ts, pkt.Src, pkt.Dst, pkt.SrcPort, pkt.DstPort, pkt.L4, l7, pkt.Bytes)
 }
 
 func envOr(key, fallback string) string {
