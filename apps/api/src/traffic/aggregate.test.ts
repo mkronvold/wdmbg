@@ -204,6 +204,41 @@ describe('aggregation', () => {
     expect(external?.rxBytes).toBe(9000);
   });
 
+  it('computes host rates as (bytes * 8) / WINDOW_SECONDS', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    // 11.25 GB RX over the 5m window → 300 Mbps average
+    const rxBytes = (300e6 / 8) * 300;
+    store.ingest({
+      probeId: 't',
+      sentAt: new Date(now * 1000).toISOString(),
+      intervalSec: 1,
+      buckets: [
+        {
+          t: now,
+          flows: [
+            {
+              src: '1.1.1.1',
+              dst: '10.0.0.8',
+              srcPort: 443,
+              dstPort: 50000,
+              l4: 'tcp',
+              l7: 'https',
+              bytesSrcToDst: rxBytes,
+              bytesDstToSrc: 0,
+              packetsSrcToDst: 1,
+              packetsDstToSrc: 0,
+            },
+          ],
+        },
+      ],
+    });
+    const summary = hostSummary(store, '10.0.0.8', '5m', now);
+    expect(summary.rxBytes).toBe(rxBytes);
+    expect(summary.rxRateBps).toBeCloseTo(300e6, 3);
+    expect(summary.txRateBps).toBe(0);
+  });
+
   it('merges duplicate flow keys across buckets', () => {
     const store = new TrafficStore();
     const now = 1_800_000_000;

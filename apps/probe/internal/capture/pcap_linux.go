@@ -64,12 +64,14 @@ func parsePacket(pkt gopacket.Packet) (Packet, bool) {
 			ts = time.Now()
 		}
 	}
-	length := uint64(0)
-	if meta != nil && meta.CaptureLength > 0 {
-		length = uint64(meta.CaptureLength)
-	} else if meta != nil {
-		length = uint64(meta.Length)
+	// Bandwidth must use on-wire Length, not snaplen-truncated CaptureLength.
+	// Default snaplen is 128; bulk ~1500B frames were undercounted ~12×.
+	capLen, wireLen := 0, 0
+	if meta != nil {
+		capLen = meta.CaptureLength
+		wireLen = meta.Length
 	}
+	length := WireBytes(capLen, wireLen)
 
 	var src, dst string
 	if ip4 := pkt.Layer(layers.LayerTypeIPv4); ip4 != nil {
@@ -100,9 +102,6 @@ func parsePacket(pkt gopacket.Packet) (Packet, bool) {
 		l4 = aggregate.L4ICMP
 	}
 
-	if length == 0 {
-		length = 64
-	}
 	return Packet{
 		Ts:      ts,
 		Src:     src,

@@ -56,6 +56,16 @@ go run . -iface vmbr0 -ingest-url http://wdmbg.lan/api/ingest/rollups
 | `-simulate` | `WDMBG_SIMULATE` | off |
 | `-once` | — | run brief simulate and exit |
 
+### Byte accounting
+
+- Rollup counters are **on-the-wire frame bytes** (`pcap` `Length`), not the
+  snaplen-truncated capture slice (`CaptureLength`).
+- Snaplen only limits how much of each frame is copied for parsing headers;
+  volume math must still use the original frame size (otherwise bulk ~1500 B
+  packets with snaplen 128 undercount by ~12×).
+- Export POST runs on a background goroutine so HTTP latency cannot stall the
+  capture loop.
+
 ## Runtime layout
 
 | Item | Intent |

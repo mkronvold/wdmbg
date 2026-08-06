@@ -22,6 +22,23 @@ describe('formatMbps / rateMbps', () => {
     expect(formatMbps(30_000_000, 30)).toBe('8.00');
   });
 
+  it('locks 300 Mbps sustained over a 5m window', () => {
+    // 300e6 bit/s × 300 s / 8 = 11_250_000_000 bytes ≈ 11250 MB
+    const windowSec = 300;
+    const bytes = (300e6 / 8) * windowSec;
+    expect(bytes).toBe(11_250_000_000);
+    expect(rateMbps(bytes, windowSec)).toBeCloseTo(300, 6);
+    expect(formatMbps(bytes, windowSec)).toBe('300');
+    expect(formatMb(bytes)).toBe('11250');
+  });
+
+  it('does not double-scale already-correct byte totals', () => {
+    // Regression: display must treat API values as raw bytes, not pre-scaled MB/Mbps.
+    const bytes = 1_000_000; // 1 MB over 1s → 8 Mbps
+    expect(rateMbps(bytes, 1)).toBeCloseTo(8, 6);
+    expect(formatMb(bytes)).toBe('1.00');
+  });
+
   it('returns 0 for invalid window', () => {
     expect(rateMbps(1000, 0)).toBe(0);
     expect(formatMbps(1000, 0)).toBe('0');
