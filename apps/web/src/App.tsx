@@ -71,7 +71,7 @@ const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 const TRAFFIC_WINDOW_KEY = 'wdmbg.trafficWindow';
 const VISUALIZATION_KEY = 'wdmbg.visualization';
 
-const VISUALIZATION_OPTIONS = ['bars', 'lines'] as const;
+const VISUALIZATION_OPTIONS = ['bars', 'lines', 'off'] as const;
 type VisualizationMode = (typeof VISUALIZATION_OPTIONS)[number];
 
 /** Builtin ids in factory visible-first order (hidden builtins follow). */

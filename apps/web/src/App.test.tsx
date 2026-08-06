@@ -846,6 +846,8 @@ describe('App', () => {
 
     const vizGroup = view.getByRole('group', { name: 'Visualization' });
     expect(within(vizGroup).getByRole('button', { name: 'bars' })).toHaveClass('primary');
+    expect(within(vizGroup).getByRole('button', { name: 'lines' })).toBeInTheDocument();
+    expect(within(vizGroup).getByRole('button', { name: 'off' })).toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.visualization')).toBeNull();
 
     const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
@@ -902,6 +904,46 @@ describe('App', () => {
       .getByRole('heading', { name: 'Top talkers' })
       .closest('section')!;
     expect(remountedTalkers.querySelectorAll('tbody tr.viz-row.viz-lines').length).toBe(2);
+  });
+
+  it('switches Visualization to off and persists with no row viz classes', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
+    const { container, unmount } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    openSettings(view);
+    const group = view.getByRole('group', { name: 'Visualization' });
+    fireEvent.click(within(group).getByRole('button', { name: 'off' }));
+    expect(localStorage.getItem('wdmbg.visualization')).toBe('off');
+    expect(within(group).getByRole('button', { name: 'off' })).toHaveClass('primary');
+
+    const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
+    expect(talkers.querySelector('tbody tr.viz-row')).toBeNull();
+    expect(talkers.querySelector('tbody tr.viz-bars')).toBeNull();
+    expect(talkers.querySelector('tbody tr.viz-lines')).toBeNull();
+
+    const flows = view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
+    expect(flows.querySelector('tbody tr.viz-row')).toBeNull();
+
+    unmount();
+    const remounted = renderApp();
+    const remountedView = within(remounted.container);
+    await waitFor(() => {
+      expect(remountedView.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    openSettings(remountedView);
+    expect(
+      within(remountedView.getByRole('group', { name: 'Visualization' })).getByRole('button', {
+        name: 'off',
+      }),
+    ).toHaveClass('primary');
+    const remountedTalkers = remountedView
+      .getByRole('heading', { name: 'Top talkers' })
+      .closest('section')!;
+    expect(remountedTalkers.querySelector('tbody tr.viz-row')).toBeNull();
   });
 
   it('defaults Visualization to bars when stored value is invalid', async () => {
