@@ -120,8 +120,9 @@ export function topReceivers(flows: StoredFlow[], limit = 10, labels?: LabelLook
 }
 
 /**
- * UI: "Top Talkers to Local". Ranks LAN hosts by TX after filterFlows.
+ * UI: "Top Receivers from Internet". Ranks LAN hosts by TX after filterFlows.
  * With excludeLocal, LAN↔LAN bytes are stripped so totals reflect non-local peers only.
+ * (UI defaults to RX Mbps sort on this card.)
  */
 export function topLocalTalkers(
   flows: StoredFlow[],
@@ -133,8 +134,9 @@ export function topLocalTalkers(
 }
 
 /**
- * UI: "Top Receivers from Local". Ranks LAN hosts by RX after filterFlows.
+ * UI: "Top Talkers to Internet". Ranks LAN hosts by RX after filterFlows.
  * With excludeLocal, LAN↔LAN bytes are stripped so totals reflect non-local peers only.
+ * (UI defaults to TX Mbps sort on this card.)
  */
 export function topLocalReceivers(
   flows: StoredFlow[],

@@ -879,10 +879,10 @@ export function App() {
     topLocalTalkers: dashboard.data ? (
       <DataTable
         key="topLocalTalkers"
-        title="Top Talkers to Local"
+        title="Top Receivers from Internet"
         legend={legend}
         rows={dashboard.data.topLocalTalkers}
-        defaultSortKey="txr"
+        defaultSortKey="rxr"
         {...cardChrome('topLocalTalkers')}
         columns={[
           {
@@ -938,10 +938,10 @@ export function App() {
     topLocalReceivers: dashboard.data ? (
       <DataTable
         key="topLocalReceivers"
-        title="Top Receivers from Local"
+        title="Top Talkers to Internet"
         legend={legend}
         rows={dashboard.data.topLocalReceivers}
-        defaultSortKey="rxr"
+        defaultSortKey="txr"
         {...cardChrome('topLocalReceivers')}
         columns={[
           {
@@ -1268,6 +1268,19 @@ export function App() {
                   ))}
                 </div>
               </div>
+              <div className="window-control">
+                <p className="window-label">Edit Layout</p>
+                <button
+                  type="button"
+                  className={editMode ? 'primary' : 'copy-btn'}
+                  aria-pressed={editMode}
+                  aria-label={editMode ? 'Edit Layout On' : 'Edit Layout Off'}
+                  title={editMode ? 'Edit Layout On' : 'Edit Layout Off'}
+                  onClick={() => setEditMode((v) => !v)}
+                >
+                  {editMode ? 'On' : 'Off'}
+                </button>
+              </div>
             </div>
           ) : null}
           <p className="muted small">
@@ -1409,15 +1422,6 @@ export function App() {
         ) : (
           <span className="sha-link muted">{sha.short}</span>
         )}
-        <button
-          type="button"
-          className="footer-edit-link"
-          aria-pressed={editMode}
-          aria-label={editMode ? 'Done editing layout' : 'Edit layout'}
-          onClick={() => setEditMode((v) => !v)}
-        >
-          {editMode ? 'Done' : 'Edit'}
-        </button>
       </footer>
     </div>
   );

@@ -172,6 +172,14 @@ function openSettings(view: ReturnType<typeof within>) {
   return gear;
 }
 
+function setEditLayout(view: ReturnType<typeof within>, on: boolean) {
+  openSettings(view);
+  const offBtn = view.queryByRole('button', { name: 'Edit Layout Off' });
+  const onBtn = view.queryByRole('button', { name: 'Edit Layout On' });
+  if (on && offBtn) fireEvent.click(offBtn);
+  if (!on && onBtn) fireEvent.click(onBtn);
+}
+
 describe('App', () => {
   beforeEach(() => {
     cleanup();
@@ -244,22 +252,23 @@ describe('App', () => {
     expect(view.getByRole('columnheader', { name: 'TX Rate' })).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'RX Rate' })).toBeInTheDocument();
     // Local talker/receiver cards are hidden on first load (edit mode still shows them dulled).
-    expect(view.queryByRole('heading', { name: 'Top Talkers to Local' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top Receivers from Internet' })).not.toBeInTheDocument();
     expect(
-      view.queryByRole('heading', { name: 'Top Receivers from Local' }),
+      view.queryByRole('heading', { name: 'Top Talkers to Internet' }),
     ).not.toBeInTheDocument();
     // Drag handles are edit-mode only
     expect(view.queryByLabelText('Drag to reorder Top talkers')).not.toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    openSettings(view);
+    expect(view.getByRole('button', { name: 'Edit Layout Off' })).toBeInTheDocument();
+    setEditLayout(view, true);
     expect(view.getByLabelText('Drag to reorder Top talkers')).toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit Layout On' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Hide Top talkers' })).toBeInTheDocument();
     expect(
-      view.getByRole('heading', { name: 'Top Talkers to Local' }).closest('section'),
+      view.getByRole('heading', { name: 'Top Receivers from Internet' }).closest('section'),
     ).toHaveClass('is-hidden-card');
     expect(
-      view.getByRole('heading', { name: 'Top Receivers from Local' }).closest('section'),
+      view.getByRole('heading', { name: 'Top Talkers to Internet' }).closest('section'),
     ).toHaveClass('is-hidden-card');
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
@@ -272,17 +281,17 @@ describe('App', () => {
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
     });
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Hide Top protocols' }));
     expect(view.getByRole('heading', { name: 'Top protocols' }).closest('section')).toHaveClass(
       'is-hidden-card',
     );
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.queryByRole('heading', { name: 'Top protocols' })).not.toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
     fireEvent.click(view.getByRole('button', { name: 'Show Top protocols' }));
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
   });
 
@@ -293,14 +302,14 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     // Local cards are hidden by default; reveal in edit mode for header checks.
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
 
     const expected = ['Host', 'TX MB', 'RX MB', 'TX Mbps', 'RX Mbps'];
     for (const title of [
       'Top talkers',
       'Top receivers',
-      'Top Talkers to Local',
-      'Top Receivers from Local',
+      'Top Receivers from Internet',
+      'Top Talkers to Internet',
     ]) {
       const section = view.getByRole('heading', { name: title }).closest('section')!;
       const headers = within(section)
@@ -316,7 +325,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
 
     const expectSort = (
       title: string,
@@ -332,8 +341,8 @@ describe('App', () => {
 
     expectSort('Top talkers', /TX Mbps/, 'descending');
     expectSort('Top receivers', /RX Mbps/, 'descending');
-    expectSort('Top Talkers to Local', /TX Mbps/, 'descending');
-    expectSort('Top Receivers from Local', /RX Mbps/, 'descending');
+    expectSort('Top Receivers from Internet', /RX Mbps/, 'descending');
+    expectSort('Top Talkers to Internet', /TX Mbps/, 'descending');
     expectSort('Top protocols', /^MB/, 'descending');
     expectSort('Bulk flows', /^MB/, 'descending');
     expectSort('Traffic summary', /Bucket/, 'ascending');
@@ -349,9 +358,9 @@ describe('App', () => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
     expect(view.getByRole('heading', { name: 'Top receivers' })).toBeInTheDocument();
-    expect(view.queryByRole('heading', { name: 'Top Talkers to Local' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top Receivers from Internet' })).not.toBeInTheDocument();
     expect(
-      view.queryByRole('heading', { name: 'Top Receivers from Local' }),
+      view.queryByRole('heading', { name: 'Top Talkers to Internet' }),
     ).not.toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.hiddenCards')).toBeNull();
   });
@@ -361,9 +370,9 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top Talkers to Local' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Top Receivers from Internet' })).toBeInTheDocument();
     });
-    expect(view.getByRole('heading', { name: 'Top Receivers from Local' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Talkers to Internet' })).toBeInTheDocument();
   });
 
   it('applies HostDialog default sorts when no saved sort exists', async () => {
@@ -558,18 +567,21 @@ describe('App', () => {
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
     expect(view.queryByRole('group', { name: 'Traffic window' })).not.toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Edit Layout Off' })).not.toBeInTheDocument();
 
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'true');
     expect(view.getByLabelText('Color theme')).toBeInTheDocument();
     expect(view.getByRole('group', { name: 'Traffic window' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit Layout Off' })).toBeInTheDocument();
+    expect(view.getByText('Edit Layout')).toBeInTheDocument();
     expect(view.getByRole('combobox', { name: 'Display Refresh' })).toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('1');
 
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Edit Layout Off' })).not.toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('0');
   });
 
@@ -835,7 +847,7 @@ describe('App', () => {
       view.queryByRole('button', { name: /Make Bulk flows full width/i }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     const wideBtn = view.getByRole('button', { name: 'Make Bulk flows full width' });
     expect(wideBtn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(wideBtn);
@@ -850,7 +862,7 @@ describe('App', () => {
       'hotFlows',
     ]);
 
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(flowsPanel()).toHaveClass('is-wide-card');
     expect(view.queryByRole('button', { name: /Make Bulk flows/i })).not.toBeInTheDocument();
   });
@@ -965,7 +977,7 @@ describe('App', () => {
     });
 
     expect(view.queryByRole('button', { name: 'Add URL card' })).not.toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Add URL card' }));
 
     const addForm = view.getByRole('form', { name: 'Add URL card' });
@@ -1012,10 +1024,10 @@ describe('App', () => {
 
     fireEvent.click(view.getByRole('button', { name: 'Hide Grafana' }));
     expect(panel).toHaveClass('is-hidden-card');
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.queryByRole('heading', { name: 'Grafana' })).not.toBeInTheDocument();
 
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     expect(view.getByRole('heading', { name: 'Grafana' })).toBeInTheDocument();
     fireEvent.click(view.getByRole('button', { name: 'Show Grafana' }));
     fireEvent.click(view.getByRole('button', { name: 'Make Grafana full width' }));
@@ -1024,7 +1036,7 @@ describe('App', () => {
     );
     expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).toContain(urlId);
 
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     const viewPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
     const refreshBtn = within(viewPanel).getByRole('button', { name: 'Refresh Grafana' });
     const iframeBefore = viewPanel.querySelector('iframe');
@@ -1038,7 +1050,7 @@ describe('App', () => {
     expect(popout).toHaveAttribute('target', '_blank');
     expect(popout).toHaveAttribute('rel', expect.stringContaining('noopener'));
 
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Edit Grafana' }));
     const editForm = view.getByRole('form', { name: 'Edit Grafana card' });
     fireEvent.change(within(editForm).getByLabelText('Refresh'), { target: { value: '60' } });
@@ -1049,7 +1061,7 @@ describe('App', () => {
     ) as Array<{ refreshSec?: number; scale?: number }>;
     expect(storedRefresh[0]?.refreshSec).toBe(60);
     expect(storedRefresh[0]?.scale).toBe(0.5);
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     const scaledPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
     const scaledWrap = scaledPanel.querySelector('.url-card-frame-wrap');
     const scaledFrame = scaledPanel.querySelector('iframe');
@@ -1071,7 +1083,7 @@ describe('App', () => {
       'is-wide-card',
     );
 
-    fireEvent.click(view2.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view2, true);
     fireEvent.click(view2.getByRole('button', { name: 'Delete Grafana' }));
     fireEvent.click(view2.getByRole('button', { name: 'Confirm delete Grafana' }));
     expect(view2.queryByRole('heading', { name: 'Grafana' })).not.toBeInTheDocument();
@@ -1090,7 +1102,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
     });
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Add URL card' }));
     const addForm = view.getByRole('form', { name: 'Add URL card' });
     fireEvent.change(within(addForm).getByLabelText('Title'), { target: { value: 'Bad' } });
@@ -1122,7 +1134,7 @@ describe('App', () => {
       JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]') as string[];
 
     expect(view.queryByRole('button', { name: 'Move Top talkers up' })).not.toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
 
     const firstUp = view.getByRole('button', { name: 'Move Traffic summary up' });
     const firstDown = view.getByRole('button', { name: 'Move Traffic summary down' });
@@ -1148,7 +1160,7 @@ describe('App', () => {
     order = readOrder();
     expect(order.indexOf('url:dash')).toBe(order.indexOf('trafficSummary') + 1);
 
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.queryByRole('button', { name: 'Move Dash up' })).not.toBeInTheDocument();
     const viewFrame = view
       .getByRole('heading', { name: 'Dash' })
