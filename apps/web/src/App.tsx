@@ -559,6 +559,8 @@ export function App() {
 
   const secs = WINDOW_SECONDS[window];
   const legend = windowLegend(window);
+  // DataTable only draws bars/lines; map settings "off" → undefined (no viz-off class).
+  const tableVisualization = visualization === 'off' ? undefined : visualization;
   const geoipPresent = health.data?.geoip?.present === true;
 
   const onDragStart = useCallback((event: DragEvent<HTMLElement>, cardId: string) => {
@@ -804,7 +806,7 @@ export function App() {
         rows={summaryRows}
         defaultSortKey="b"
         defaultSortDir="asc"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('trafficSummary')}
         columns={[
           {
@@ -853,7 +855,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topTalkers}
         defaultSortKey="txr"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('topTalkers')}
         columns={[
           {
@@ -913,7 +915,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topReceivers}
         defaultSortKey="rxr"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('topReceivers')}
         columns={[
           {
@@ -973,7 +975,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topLocalTalkers}
         defaultSortKey="rxr"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('topLocalTalkers')}
         columns={[
           {
@@ -1033,7 +1035,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topLocalReceivers}
         defaultSortKey="txr"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('topLocalReceivers')}
         columns={[
           {
@@ -1093,7 +1095,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topProtocols}
         defaultSortKey="b"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('topProtocols')}
         columns={[
           {
@@ -1126,7 +1128,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.hotFlows}
         defaultSortKey="b"
-        visualization={visualization}
+        visualization={tableVisualization}
         {...cardChrome('hotFlows')}
         columns={[
           {
@@ -1195,7 +1197,7 @@ export function App() {
           legend={legend}
           rows={dashboard.data.topCountries}
           defaultSortKey="b"
-          visualization={visualization}
+          visualization={tableVisualization}
           {...cardChrome('topCountries')}
           columns={[
             { key: 'c', header: 'Country', width: 'primary', render: (r: CountryRow) => r.country },

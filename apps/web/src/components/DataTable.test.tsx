@@ -84,19 +84,4 @@ describe('DataTable visualization', () => {
     );
     expect(container.querySelector('tbody tr.viz-row')).toBeNull();
   });
-
-  it('omits visualization when mode is off', () => {
-    const { container } = render(
-      <DataTable
-        title="Demo"
-        rows={rows}
-        columns={columns}
-        defaultSortKey="b"
-        visualization="off"
-      />,
-    );
-    expect(container.querySelector('tbody tr.viz-row')).toBeNull();
-    expect(container.querySelector('tbody tr.viz-bars')).toBeNull();
-    expect(container.querySelector('tbody tr.viz-lines')).toBeNull();
-  });
 });
