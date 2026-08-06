@@ -59,6 +59,18 @@ body {
   gap: 0.75rem;
 }
 
+.title-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+}
+
+.title-row-actions .settings-toggle {
+  margin-top: 0;
+}
+
 .hero h1 {
   margin: 0.25rem 0;
   font-size: clamp(2.2rem, 5vw, 3.25rem);
@@ -670,24 +682,6 @@ th {
 }
 
 a.sha-link:hover {
-  color: var(--theme-link);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.footer-edit-link {
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--theme-muted-text);
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.footer-edit-link:hover,
-.footer-edit-link[aria-pressed='true'] {
   color: var(--theme-link);
   text-decoration: underline;
   text-underline-offset: 2px;

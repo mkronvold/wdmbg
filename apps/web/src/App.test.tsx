@@ -191,6 +191,23 @@ function openSettings(view: ReturnType<typeof within>) {
   return gear;
 }
 
+function setEditLayout(view: ReturnType<typeof within>, on: boolean) {
+  if (on) {
+    openSettings(view);
+    const editBtn = view.queryByRole('button', { name: 'Edit Layout' });
+    if (editBtn) fireEvent.click(editBtn);
+    return;
+  }
+  const saveBtn = view.queryByRole('button', { name: 'Save Layout' });
+  if (saveBtn) {
+    fireEvent.click(saveBtn);
+    return;
+  }
+  openSettings(view);
+  const settingsSave = view.queryByRole('button', { name: 'Save Layout' });
+  if (settingsSave) fireEvent.click(settingsSave);
+}
+
 describe('App', () => {
   beforeEach(() => {
     cleanup();
@@ -235,7 +252,7 @@ describe('App', () => {
     cleanup();
   });
 
-  it('renders the WDMBG shell and window controls', async () => {
+  it('renders the WDMBG shell and factory default layout', async () => {
     const { container } = renderApp();
     const view = within(container);
     expect(view.getByRole('heading', { level: 1, name: 'WDMBG' })).toBeInTheDocument();
@@ -243,6 +260,8 @@ describe('App', () => {
     const gear = view.getByRole('button', { name: 'Settings' });
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByText('Traffic window')).not.toBeInTheDocument();
+    // Edit Layout lives in Settings, not the footer.
+    expect(view.queryByRole('button', { name: 'Edit Layout' })).not.toBeInTheDocument();
     openSettings(view);
     expect(gear).toHaveAttribute('aria-expanded', 'true');
     expect(view.getByText('Traffic window')).toBeInTheDocument();
@@ -250,58 +269,69 @@ describe('App', () => {
     expect(view.getByRole('button', { name: '30s' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: '15m' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: '1h' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit Layout' })).toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Reset Layout' })).not.toBeInTheDocument();
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(
+        view.getByRole('heading', { name: 'Top Receivers from Internet' }),
+      ).toBeInTheDocument();
     });
-    expect(view.getAllByText(/last 30s/).length).toBeGreaterThan(0);
-    expect(view.getAllByRole('columnheader', { name: /TX Mbps/ }).length).toBeGreaterThan(0);
-    expect(view.getAllByRole('columnheader', { name: /TX MB/ }).length).toBeGreaterThan(0);
+    expect(view.getByRole('heading', { name: 'Top Talkers to Internet' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Speedify' })).toBeInTheDocument();
     expect(view.getByRole('heading', { name: 'Bulk flows' })).toBeInTheDocument();
     expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Bulk flows' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
     expect(view.getByText('Local')).toBeInTheDocument();
     expect(view.getByText('Internet')).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'TX Rate' })).toBeInTheDocument();
     expect(view.getByRole('columnheader', { name: 'RX Rate' })).toBeInTheDocument();
-    // Local talker/receiver cards are hidden on first load (edit mode still shows them dulled).
-    expect(view.queryByRole('heading', { name: 'Top Talkers to Local' })).not.toBeInTheDocument();
-    expect(
-      view.queryByRole('heading', { name: 'Top Receivers from Local' }),
-    ).not.toBeInTheDocument();
+    // Classic talker/receiver/protocol cards hidden on first load.
+    expect(view.queryByRole('heading', { name: 'Top talkers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top receivers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top protocols' })).not.toBeInTheDocument();
     // Drag handles are edit-mode only
-    expect(view.queryByLabelText('Drag to reorder Top talkers')).not.toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
-    expect(view.getByLabelText('Drag to reorder Top talkers')).toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Hide Top talkers' })).toBeInTheDocument();
     expect(
-      view.getByRole('heading', { name: 'Top Talkers to Local' }).closest('section'),
-    ).toHaveClass('is-hidden-card');
-    expect(
-      view.getByRole('heading', { name: 'Top Receivers from Local' }).closest('section'),
-    ).toHaveClass('is-hidden-card');
+      view.queryByLabelText('Drag to reorder Top Receivers from Internet'),
+    ).not.toBeInTheDocument();
+    setEditLayout(view, true);
+    expect(view.getByLabelText('Drag to reorder Top Receivers from Internet')).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Save Layout' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Reset Layout' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Show Top talkers' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top talkers' }).closest('section')).toHaveClass(
+      'is-hidden-card',
+    );
+    expect(view.getByRole('heading', { name: 'Top receivers' }).closest('section')).toHaveClass(
+      'is-hidden-card',
+    );
+    expect(view.getByRole('heading', { name: 'Top protocols' }).closest('section')).toHaveClass(
+      'is-hidden-card',
+    );
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
     expect(view.getByText('sha-dev')).toBeInTheDocument();
   });
 
   it('hides cards outside edit mode and restores them', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
       expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
     });
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Hide Top protocols' }));
     expect(view.getByRole('heading', { name: 'Top protocols' }).closest('section')).toHaveClass(
       'is-hidden-card',
     );
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.queryByRole('heading', { name: 'Top protocols' })).not.toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
     fireEvent.click(view.getByRole('button', { name: 'Show Top protocols' }));
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
   });
 
@@ -309,17 +339,17 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     // Local cards are hidden by default; reveal in edit mode for header checks.
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
 
     const expected = ['Host', 'TX MB', 'RX MB', 'TX Mbps', 'RX Mbps'];
     for (const title of [
       'Top talkers',
       'Top receivers',
-      'Top Talkers to Local',
-      'Top Receivers from Local',
+      'Top Receivers from Internet',
+      'Top Talkers to Internet',
     ]) {
       const section = view.getByRole('heading', { name: title }).closest('section')!;
       const headers = within(section)
@@ -333,9 +363,9 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
 
     const expectSort = (
       title: string,
@@ -351,8 +381,8 @@ describe('App', () => {
 
     expectSort('Top talkers', /TX Mbps/, 'descending');
     expectSort('Top receivers', /RX Mbps/, 'descending');
-    expectSort('Top Talkers to Local', /TX Mbps/, 'descending');
-    expectSort('Top Receivers from Local', /RX Mbps/, 'descending');
+    expectSort('Top Receivers from Internet', /RX Mbps/, 'descending');
+    expectSort('Top Talkers to Internet', /TX Mbps/, 'descending');
     expectSort('Top protocols', /^MB/, 'descending');
     expectSort('Bulk flows', /^MB/, 'descending');
     expectSort('Traffic summary', /Bucket/, 'ascending');
@@ -361,35 +391,44 @@ describe('App', () => {
     expect(localStorage.getItem('wdmbg.tableSort')).toBeNull();
   });
 
-  it('hides local talker/receiver cards by default without writing hiddenCards', async () => {
+  it('applies factory hidden cards without writing hiddenCards', async () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(
+        view.getByRole('heading', { name: 'Top Receivers from Internet' }),
+      ).toBeInTheDocument();
     });
-    expect(view.getByRole('heading', { name: 'Top receivers' })).toBeInTheDocument();
-    expect(view.queryByRole('heading', { name: 'Top Talkers to Local' })).not.toBeInTheDocument();
-    expect(
-      view.queryByRole('heading', { name: 'Top Receivers from Local' }),
-    ).not.toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Talkers to Internet' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Speedify' })).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top talkers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top receivers' })).not.toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Top protocols' })).not.toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.hiddenCards')).toBeNull();
+    expect(localStorage.getItem('wdmbg.dashboard.wideCards')).toBeNull();
+    expect(localStorage.getItem('wdmbg.dashboard.urlCards')).toBeNull();
+    expect(view.getByRole('heading', { name: 'Bulk flows' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
   });
 
-  it('respects a saved empty hiddenCards list (show local cards)', async () => {
+  it('respects a saved empty hiddenCards list (show all builtins)', async () => {
     localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top Talkers to Local' })).toBeInTheDocument();
+      expect(
+        view.getByRole('heading', { name: 'Top Receivers from Internet' }),
+      ).toBeInTheDocument();
     });
-    expect(view.getByRole('heading', { name: 'Top Receivers from Local' })).toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top Talkers to Internet' })).toBeInTheDocument();
   });
 
   it('applies HostDialog default sorts when no saved sort exists', async () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
     const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
@@ -423,6 +462,7 @@ describe('App', () => {
   });
 
   it('packs metric columns and marks primary text columns', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
@@ -473,7 +513,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
     const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
@@ -497,7 +537,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
     const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
@@ -551,7 +591,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
 
     fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
@@ -577,19 +617,116 @@ describe('App', () => {
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
     expect(view.queryByRole('group', { name: 'Traffic window' })).not.toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Edit Layout' })).not.toBeInTheDocument();
 
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'true');
     expect(view.getByLabelText('Color theme')).toBeInTheDocument();
     expect(view.getByRole('group', { name: 'Traffic window' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit Layout' })).toBeInTheDocument();
     expect(view.getByRole('combobox', { name: 'Display Refresh' })).toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('1');
 
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Edit Layout' })).not.toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('0');
+  });
+
+  it('exits edit mode via header Save Layout when settings are closed', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
+    });
+
+    setEditLayout(view, true);
+    expect(view.getByLabelText('Drag to reorder Top Receivers from Internet')).toBeInTheDocument();
+
+    // Close settings while still editing — header Save Layout remains available.
+    fireEvent.click(view.getByRole('button', { name: 'Settings' }));
+    expect(view.queryByRole('button', { name: 'Edit Layout' })).not.toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Save Layout' })).toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Reset Layout' })).not.toBeInTheDocument();
+
+    fireEvent.click(view.getByRole('button', { name: 'Save Layout' }));
+    expect(
+      view.queryByLabelText('Drag to reorder Top Receivers from Internet'),
+    ).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Save Layout' })).not.toBeInTheDocument();
+  });
+
+  it('Reset Layout restores factory defaults and stays in edit mode', async () => {
+    localStorage.setItem(
+      'wdmbg.dashboard.urlCards',
+      JSON.stringify([{ id: 'url:custom', title: 'Custom', url: 'https://custom.example' }]),
+    );
+    localStorage.setItem(
+      'wdmbg.dashboard.cardOrder',
+      JSON.stringify(['topTalkers', 'url:custom', 'topReceivers', 'hotFlows']),
+    );
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
+    localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['topTalkers']));
+
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Custom' })).toBeInTheDocument();
+    });
+
+    setEditLayout(view, true);
+    expect(view.getByRole('button', { name: 'Reset Layout' })).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'Reset Layout' }));
+
+    // Still editing after reset.
+    expect(view.getByRole('button', { name: 'Save Layout' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Reset Layout' })).toBeInTheDocument();
+    expect(view.getByLabelText('Drag to reorder Top Receivers from Internet')).toBeInTheDocument();
+
+    expect(view.getByRole('heading', { name: 'Speedify' })).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Custom' })).not.toBeInTheDocument();
+    expect(view.getByRole('heading', { name: 'Top talkers' }).closest('section')).toHaveClass(
+      'is-hidden-card',
+    );
+    expect(view.getByRole('heading', { name: 'Bulk flows' }).closest('section')).toHaveClass(
+      'is-wide-card',
+    );
+
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.urlCards') ?? '[]')).toEqual([
+      {
+        id: 'url:speedify',
+        title: 'Speedify',
+        url: 'https://speedify.kronvold.org',
+        heightRem: 19,
+      },
+    ]);
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.hiddenCards') ?? '[]')).toEqual([
+      'topTalkers',
+      'topReceivers',
+      'topProtocols',
+      'topCountries',
+    ]);
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).toEqual([
+      'hotFlows',
+    ]);
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]')).toEqual([
+      'topLocalTalkers',
+      'topLocalReceivers',
+      'url:speedify',
+      'trafficSummary',
+      'hotFlows',
+      'topTalkers',
+      'topReceivers',
+      'topProtocols',
+      'topCountries',
+    ]);
+
+    // Reset control hides after Save Layout.
+    setEditLayout(view, false);
+    openSettings(view);
+    expect(view.queryByRole('button', { name: 'Reset Layout' })).not.toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit Layout' })).toBeInTheDocument();
   });
 
   it('restores settings open preference on load', async () => {
@@ -651,7 +788,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
 
     const callsAfterMount = vi.mocked(client.fetchDashboard).mock.calls.length;
@@ -675,7 +812,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
 
     openSettings(view);
@@ -689,6 +826,7 @@ describe('App', () => {
   });
 
   it('defaults Visualization to bars and renders relative row bars on dashboard cards', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
@@ -719,9 +857,9 @@ describe('App', () => {
 
     const flows = view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
     expect(flows.querySelectorAll('tbody tr.viz-row.viz-bars').length).toBe(1);
-    expect(
-      (flows.querySelector('tbody tr.viz-row') as HTMLElement).getAttribute('style'),
-    ).toMatch(/--viz-pct:\s*100%/);
+    expect((flows.querySelector('tbody tr.viz-row') as HTMLElement).getAttribute('style')).toMatch(
+      /--viz-pct:\s*100%/,
+    );
 
     const protocols = view.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
     const protoRows = protocols.querySelectorAll('tbody tr.viz-row.viz-bars');
@@ -732,6 +870,7 @@ describe('App', () => {
   });
 
   it('persists Visualization selection and switches bars to lines', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     const { container, unmount } = renderApp();
     const view = within(container);
     await waitFor(() => {
@@ -781,7 +920,7 @@ describe('App', () => {
     const { container, unmount } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
 
     openSettings(view);
@@ -797,7 +936,7 @@ describe('App', () => {
     const remounted = renderApp();
     const remountedView = within(remounted.container);
     await waitFor(() => {
-      expect(remountedView.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(remountedView.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '5m')).toBe(true);
     // Opening settings also restores the panel because toggle persisted open='1'.
@@ -814,7 +953,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[0] === '30s')).toBe(true);
     openSettings(view);
@@ -829,7 +968,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
 
     openSettings(view);
@@ -874,6 +1013,7 @@ describe('App', () => {
   });
 
   it('shows Top traffic by country only when geoip present', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     vi.mocked(client.fetchHealth).mockResolvedValue({
       status: 'ok',
       service: 'wdmbg-api',
@@ -891,7 +1031,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     expect(view.queryByRole('heading', { name: 'Top traffic by country' })).not.toBeInTheDocument();
     expect(view.queryByRole('columnheader', { name: 'Country' })).not.toBeInTheDocument();
@@ -905,6 +1045,7 @@ describe('App', () => {
   });
 
   it('shows Country columns when geoip is present', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     vi.mocked(client.fetchHealth).mockResolvedValue({
       status: 'ok',
       service: 'wdmbg-api',
@@ -914,7 +1055,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     await waitFor(() => {
       expect(view.getAllByRole('columnheader', { name: 'Country' }).length).toBeGreaterThanOrEqual(
@@ -938,37 +1079,38 @@ describe('App', () => {
     });
 
     const flowsPanel = () => view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
-    expect(flowsPanel()).not.toHaveClass('is-wide-card');
+    // Factory default: Bulk flows is wide without writing localStorage yet.
+    expect(flowsPanel()).toHaveClass('is-wide-card');
+    expect(localStorage.getItem('wdmbg.dashboard.wideCards')).toBeNull();
     expect(
-      view.queryByRole('button', { name: /Make Bulk flows full width/i }),
+      view.queryByRole('button', { name: /Make Bulk flows normal width/i }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
-    const wideBtn = view.getByRole('button', { name: 'Make Bulk flows full width' });
-    expect(wideBtn).toHaveAttribute('aria-pressed', 'false');
+    setEditLayout(view, true);
+    const wideBtn = view.getByRole('button', { name: 'Make Bulk flows normal width' });
+    expect(wideBtn).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(wideBtn);
 
-    // Panel remounts under `.grid-wide` when width toggles — re-query the section.
-    expect(flowsPanel()).toHaveClass('is-wide-card');
-    expect(view.getByRole('button', { name: 'Make Bulk flows normal width' })).toHaveAttribute(
+    // Panel remounts under non-wide `.grid` when width toggles — re-query the section.
+    expect(flowsPanel()).not.toHaveClass('is-wide-card');
+    expect(view.getByRole('button', { name: 'Make Bulk flows full width' })).toHaveAttribute(
       'aria-pressed',
-      'true',
+      'false',
     );
-    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).toEqual([
-      'hotFlows',
-    ]);
+    expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? 'null')).toEqual([]);
 
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
-    expect(flowsPanel()).toHaveClass('is-wide-card');
+    setEditLayout(view, false);
+    expect(flowsPanel()).not.toHaveClass('is-wide-card');
     expect(view.queryByRole('button', { name: /Make Bulk flows/i })).not.toBeInTheDocument();
   });
 
   it('restores wide cards from localStorage on load', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['topTalkers']));
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     expect(view.getByRole('heading', { name: 'Top talkers' }).closest('section')).toHaveClass(
       'is-wide-card',
@@ -976,6 +1118,7 @@ describe('App', () => {
   });
 
   it('renders wide cards outside non-wide grids and keeps non-wide siblings together', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     localStorage.setItem('wdmbg.dashboard.wideCards', JSON.stringify(['hotFlows']));
     const { container } = renderApp();
     const view = within(container);
@@ -1006,6 +1149,7 @@ describe('App', () => {
   });
 
   it('persists table sort order and restores it on reload', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
     const { container, unmount } = renderApp();
     const view = within(container);
     await waitFor(() => {
@@ -1050,7 +1194,7 @@ describe('App', () => {
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
     fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
     const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
@@ -1066,14 +1210,15 @@ describe('App', () => {
   });
 
   it('adds, persists, hides, wides, and deletes URL cards', async () => {
+    localStorage.setItem('wdmbg.dashboard.urlCards', JSON.stringify([]));
     const { container, unmount } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
 
     expect(view.queryByRole('button', { name: 'Add URL card' })).not.toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Add URL card' }));
 
     const addForm = view.getByRole('form', { name: 'Add URL card' });
@@ -1120,10 +1265,10 @@ describe('App', () => {
 
     fireEvent.click(view.getByRole('button', { name: 'Hide Grafana' }));
     expect(panel).toHaveClass('is-hidden-card');
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.queryByRole('heading', { name: 'Grafana' })).not.toBeInTheDocument();
 
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     expect(view.getByRole('heading', { name: 'Grafana' })).toBeInTheDocument();
     fireEvent.click(view.getByRole('button', { name: 'Show Grafana' }));
     fireEvent.click(view.getByRole('button', { name: 'Make Grafana full width' }));
@@ -1132,7 +1277,7 @@ describe('App', () => {
     );
     expect(JSON.parse(localStorage.getItem('wdmbg.dashboard.wideCards') ?? '[]')).toContain(urlId);
 
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     const viewPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
     const refreshBtn = within(viewPanel).getByRole('button', { name: 'Refresh Grafana' });
     const iframeBefore = viewPanel.querySelector('iframe');
@@ -1146,7 +1291,7 @@ describe('App', () => {
     expect(popout).toHaveAttribute('target', '_blank');
     expect(popout).toHaveAttribute('rel', expect.stringContaining('noopener'));
 
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Edit Grafana' }));
     const editForm = view.getByRole('form', { name: 'Edit Grafana card' });
     fireEvent.change(within(editForm).getByLabelText('Refresh'), { target: { value: '60' } });
@@ -1157,7 +1302,7 @@ describe('App', () => {
     ) as Array<{ refreshSec?: number; scale?: number }>;
     expect(storedRefresh[0]?.refreshSec).toBe(60);
     expect(storedRefresh[0]?.scale).toBe(0.5);
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     const scaledPanel = view.getByRole('heading', { name: 'Grafana' }).closest('section')!;
     const scaledWrap = scaledPanel.querySelector('.url-card-frame-wrap');
     const scaledFrame = scaledPanel.querySelector('iframe');
@@ -1179,7 +1324,7 @@ describe('App', () => {
       'is-wide-card',
     );
 
-    fireEvent.click(view2.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view2, true);
     fireEvent.click(view2.getByRole('button', { name: 'Delete Grafana' }));
     fireEvent.click(view2.getByRole('button', { name: 'Confirm delete Grafana' }));
     expect(view2.queryByRole('heading', { name: 'Grafana' })).not.toBeInTheDocument();
@@ -1193,12 +1338,13 @@ describe('App', () => {
   });
 
   it('rejects invalid URL card URLs in the add form', async () => {
+    localStorage.setItem('wdmbg.dashboard.urlCards', JSON.stringify([]));
     const { container } = renderApp();
     const view = within(container);
     await waitFor(() => {
-      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
     });
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
     fireEvent.click(view.getByRole('button', { name: 'Add URL card' }));
     const addForm = view.getByRole('form', { name: 'Add URL card' });
     fireEvent.change(within(addForm).getByLabelText('Title'), { target: { value: 'Bad' } });
@@ -1230,7 +1376,7 @@ describe('App', () => {
       JSON.parse(localStorage.getItem('wdmbg.dashboard.cardOrder') ?? '[]') as string[];
 
     expect(view.queryByRole('button', { name: 'Move Top talkers up' })).not.toBeInTheDocument();
-    fireEvent.click(view.getByRole('button', { name: 'Edit layout' }));
+    setEditLayout(view, true);
 
     const firstUp = view.getByRole('button', { name: 'Move Traffic summary up' });
     const firstDown = view.getByRole('button', { name: 'Move Traffic summary down' });
@@ -1256,7 +1402,7 @@ describe('App', () => {
     order = readOrder();
     expect(order.indexOf('url:dash')).toBe(order.indexOf('trafficSummary') + 1);
 
-    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    setEditLayout(view, false);
     expect(view.queryByRole('button', { name: 'Move Dash up' })).not.toBeInTheDocument();
     const viewFrame = view
       .getByRole('heading', { name: 'Dash' })
