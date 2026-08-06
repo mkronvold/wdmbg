@@ -173,11 +173,20 @@ function openSettings(view: ReturnType<typeof within>) {
 }
 
 function setEditLayout(view: ReturnType<typeof within>, on: boolean) {
+  if (on) {
+    openSettings(view);
+    const editBtn = view.queryByRole('button', { name: 'Edit layout' });
+    if (editBtn) fireEvent.click(editBtn);
+    return;
+  }
+  const doneBtn = view.queryByRole('button', { name: 'Done editing layout' });
+  if (doneBtn) {
+    fireEvent.click(doneBtn);
+    return;
+  }
   openSettings(view);
-  const offBtn = view.queryByRole('button', { name: 'Edit Layout Off' });
-  const onBtn = view.queryByRole('button', { name: 'Edit Layout On' });
-  if (on && offBtn) fireEvent.click(offBtn);
-  if (!on && onBtn) fireEvent.click(onBtn);
+  const settingsDone = view.queryByRole('button', { name: 'Done editing layout' });
+  if (settingsDone) fireEvent.click(settingsDone);
 }
 
 describe('App', () => {
@@ -259,10 +268,11 @@ describe('App', () => {
     // Drag handles are edit-mode only
     expect(view.queryByLabelText('Drag to reorder Top talkers')).not.toBeInTheDocument();
     openSettings(view);
-    expect(view.getByRole('button', { name: 'Edit Layout Off' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
+    expect(view.getByText('Edit Layout')).toBeInTheDocument();
     setEditLayout(view, true);
     expect(view.getByLabelText('Drag to reorder Top talkers')).toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Edit Layout On' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Hide Top talkers' })).toBeInTheDocument();
     expect(
       view.getByRole('heading', { name: 'Top Receivers from Internet' }).closest('section'),
@@ -567,13 +577,13 @@ describe('App', () => {
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
     expect(view.queryByRole('group', { name: 'Traffic window' })).not.toBeInTheDocument();
-    expect(view.queryByRole('button', { name: 'Edit Layout Off' })).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Edit layout' })).not.toBeInTheDocument();
 
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'true');
     expect(view.getByLabelText('Color theme')).toBeInTheDocument();
     expect(view.getByRole('group', { name: 'Traffic window' })).toBeInTheDocument();
-    expect(view.getByRole('button', { name: 'Edit Layout Off' })).toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
     expect(view.getByText('Edit Layout')).toBeInTheDocument();
     expect(view.getByRole('combobox', { name: 'Display Refresh' })).toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('1');
@@ -581,8 +591,28 @@ describe('App', () => {
     fireEvent.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     expect(view.queryByLabelText('Color theme')).not.toBeInTheDocument();
-    expect(view.queryByRole('button', { name: 'Edit Layout Off' })).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Edit layout' })).not.toBeInTheDocument();
     expect(localStorage.getItem('wdmbg.dashboard.settingsOpen')).toBe('0');
+  });
+
+  it('exits edit mode via header Done when settings are closed', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    setEditLayout(view, true);
+    expect(view.getByLabelText('Drag to reorder Top talkers')).toBeInTheDocument();
+
+    // Close settings while still editing — header Done remains available.
+    fireEvent.click(view.getByRole('button', { name: 'Settings' }));
+    expect(view.queryByText('Edit Layout')).not.toBeInTheDocument();
+    expect(view.getByRole('button', { name: 'Done editing layout' })).toBeInTheDocument();
+
+    fireEvent.click(view.getByRole('button', { name: 'Done editing layout' }));
+    expect(view.queryByLabelText('Drag to reorder Top talkers')).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Done editing layout' })).not.toBeInTheDocument();
   });
 
   it('restores settings open preference on load', async () => {

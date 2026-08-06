@@ -1166,16 +1166,28 @@ export function App() {
             <h1>WDMBG</h1>
             <p className="subtitle">Where did my bandwidth go?</p>
           </div>
-          <button
-            type="button"
-            className={`settings-toggle${settingsOpen ? ' active' : ''}`}
-            aria-label="Settings"
-            aria-expanded={settingsOpen}
-            aria-controls="settings-panel"
-            onClick={toggleSettings}
-          >
-            <GearIcon />
-          </button>
+          <div className="title-row-actions">
+            {editMode && !settingsOpen ? (
+              <button
+                type="button"
+                className="primary"
+                aria-label="Done editing layout"
+                onClick={() => setEditMode(false)}
+              >
+                Done
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`settings-toggle${settingsOpen ? ' active' : ''}`}
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              aria-controls="settings-panel"
+              onClick={toggleSettings}
+            >
+              <GearIcon />
+            </button>
+          </div>
         </div>
         <div className="hero-meta">
           {settingsOpen ? (
@@ -1274,11 +1286,11 @@ export function App() {
                   type="button"
                   className={editMode ? 'primary' : 'copy-btn'}
                   aria-pressed={editMode}
-                  aria-label={editMode ? 'Edit Layout On' : 'Edit Layout Off'}
-                  title={editMode ? 'Edit Layout On' : 'Edit Layout Off'}
+                  aria-label={editMode ? 'Done editing layout' : 'Edit layout'}
+                  title={editMode ? 'Done editing layout' : 'Edit layout'}
                   onClick={() => setEditMode((v) => !v)}
                 >
-                  {editMode ? 'On' : 'Off'}
+                  {editMode ? 'Done' : 'Edit'}
                 </button>
               </div>
             </div>
