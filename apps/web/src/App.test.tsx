@@ -36,6 +36,14 @@ vi.mock('./api/client', () => ({
         totalBytes: 4_500_000,
         country: 'Local',
       },
+      {
+        host: '10.0.0.20',
+        label: 'nas',
+        txBytes: 7_000_000,
+        rxBytes: 500_000,
+        totalBytes: 7_500_000,
+        country: 'Local',
+      },
     ],
     topReceivers: [
       {
@@ -44,6 +52,14 @@ vi.mock('./api/client', () => ({
         txBytes: 1_500_000,
         rxBytes: 3_000_000,
         totalBytes: 4_500_000,
+        country: 'Local',
+      },
+      {
+        host: '10.0.0.20',
+        label: 'nas',
+        txBytes: 500_000,
+        rxBytes: 7_000_000,
+        totalBytes: 7_500_000,
         country: 'Local',
       },
     ],
@@ -67,7 +83,10 @@ vi.mock('./api/client', () => ({
         country: 'Local',
       },
     ],
-    topProtocols: [{ protocol: 'https', bytes: 4_000_000, packets: 100 }],
+    topProtocols: [
+      { protocol: 'https', bytes: 4_000_000, packets: 100 },
+      { protocol: 'dns', bytes: 1_000_000, packets: 40 },
+    ],
     hotFlows: [
       {
         src: '10.0.0.10',
@@ -667,6 +686,95 @@ describe('App', () => {
     await waitFor(() => {
       expect(vi.mocked(client.fetchDashboard).mock.calls.some((c) => c[1] === true)).toBe(true);
     });
+  });
+
+  it('defaults Visualization to bars and renders relative row bars on dashboard cards', async () => {
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    openSettings(view);
+    const resolve = view.getByText('Resolve Name');
+    const vizLabel = view.getByText('Visualization');
+    const traffic = view.getByText('Traffic window');
+    expect(
+      resolve.compareDocumentPosition(vizLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      vizLabel.compareDocumentPosition(traffic) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    const vizGroup = view.getByRole('group', { name: 'Visualization' });
+    expect(within(vizGroup).getByRole('button', { name: 'bars' })).toHaveClass('primary');
+    expect(localStorage.getItem('wdmbg.visualization')).toBeNull();
+
+    const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
+    const rows = talkers.querySelectorAll('tbody tr.viz-row.viz-bars');
+    expect(rows.length).toBe(2);
+    // Default sort TX Mbps: nas 7M (70%) then laptop 3M (30%) of 10M total.
+    expect((rows[0] as HTMLElement).getAttribute('style')).toMatch(/--viz-pct:\s*70%/);
+    expect((rows[1] as HTMLElement).getAttribute('style')).toMatch(/--viz-pct:\s*30%/);
+
+    const flows = view.getByRole('heading', { name: 'Bulk flows' }).closest('section')!;
+    expect(flows.querySelectorAll('tbody tr.viz-row.viz-bars').length).toBe(1);
+    expect(
+      (flows.querySelector('tbody tr.viz-row') as HTMLElement).getAttribute('style'),
+    ).toMatch(/--viz-pct:\s*100%/);
+
+    const protocols = view.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
+    const protoRows = protocols.querySelectorAll('tbody tr.viz-row.viz-bars');
+    expect(protoRows.length).toBe(2);
+    // https 4M (80%) + dns 1M (20%)
+    expect((protoRows[0] as HTMLElement).getAttribute('style')).toMatch(/--viz-pct:\s*80%/);
+    expect((protoRows[1] as HTMLElement).getAttribute('style')).toMatch(/--viz-pct:\s*20%/);
+  });
+
+  it('persists Visualization selection and switches bars to lines', async () => {
+    const { container, unmount } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    openSettings(view);
+    const group = view.getByRole('group', { name: 'Visualization' });
+    fireEvent.click(within(group).getByRole('button', { name: 'lines' }));
+    expect(localStorage.getItem('wdmbg.visualization')).toBe('lines');
+
+    const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
+    expect(talkers.querySelectorAll('tbody tr.viz-row.viz-lines').length).toBe(2);
+    expect(talkers.querySelector('tbody tr.viz-bars')).toBeNull();
+
+    unmount();
+    const remounted = renderApp();
+    const remountedView = within(remounted.container);
+    await waitFor(() => {
+      expect(remountedView.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+    openSettings(remountedView);
+    expect(
+      within(remountedView.getByRole('group', { name: 'Visualization' })).getByRole('button', {
+        name: 'lines',
+      }),
+    ).toHaveClass('primary');
+    const remountedTalkers = remountedView
+      .getByRole('heading', { name: 'Top talkers' })
+      .closest('section')!;
+    expect(remountedTalkers.querySelectorAll('tbody tr.viz-row.viz-lines').length).toBe(2);
+  });
+
+  it('defaults Visualization to bars when stored value is invalid', async () => {
+    localStorage.setItem('wdmbg.visualization', 'sparkles');
+    const { container } = renderApp();
+    const view = within(container);
+    openSettings(view);
+    expect(
+      within(view.getByRole('group', { name: 'Visualization' })).getByRole('button', {
+        name: 'bars',
+      }),
+    ).toHaveClass('primary');
   });
 
   it('persists Traffic window selection across remount', async () => {

@@ -67,6 +67,10 @@ const SETTINGS_OPEN_KEY = 'wdmbg.dashboard.settingsOpen';
 const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
 const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 const TRAFFIC_WINDOW_KEY = 'wdmbg.trafficWindow';
+const VISUALIZATION_KEY = 'wdmbg.visualization';
+
+const VISUALIZATION_OPTIONS = ['bars', 'lines'] as const;
+type VisualizationMode = (typeof VISUALIZATION_OPTIONS)[number];
 
 const DEFAULT_CARD_ORDER = [
   'trafficSummary',
@@ -195,6 +199,26 @@ function loadTrafficWindow(): QueryWindow {
 function saveTrafficWindow(w: QueryWindow) {
   try {
     localStorage.setItem(TRAFFIC_WINDOW_KEY, w);
+  } catch {
+    // ignore
+  }
+}
+
+function loadVisualization(): VisualizationMode {
+  try {
+    const raw = localStorage.getItem(VISUALIZATION_KEY);
+    if (raw && (VISUALIZATION_OPTIONS as readonly string[]).includes(raw)) {
+      return raw as VisualizationMode;
+    }
+  } catch {
+    // ignore
+  }
+  return 'bars';
+}
+
+function saveVisualization(mode: VisualizationMode) {
+  try {
+    localStorage.setItem(VISUALIZATION_KEY, mode);
   } catch {
     // ignore
   }
@@ -334,6 +358,7 @@ export function App() {
   const [resolveNameMode, setResolveNameMode] = useState<ResolveNameMode>(() =>
     loadResolveNameMode(),
   );
+  const [visualization, setVisualization] = useState<VisualizationMode>(() => loadVisualization());
   const [theme, setTheme] = useState<ThemeId>(() => resolveInitialTheme());
   const [settingsOpen, setSettingsOpen] = useState<boolean>(() => loadSettingsOpen());
   const sha = useMemo(() => gitShaLabel(), []);
@@ -468,6 +493,11 @@ export function App() {
       saveResolveNameMode(next);
       return next;
     });
+  }, []);
+
+  const onVisualizationChange = useCallback((mode: VisualizationMode) => {
+    setVisualization(mode);
+    saveVisualization(mode);
   }, []);
 
   const secs = WINDOW_SECONDS[window];
@@ -717,6 +747,7 @@ export function App() {
         rows={summaryRows}
         defaultSortKey="b"
         defaultSortDir="asc"
+        visualization={visualization}
         {...cardChrome('trafficSummary')}
         columns={[
           {
@@ -765,6 +796,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topTalkers}
         defaultSortKey="txr"
+        visualization={visualization}
         {...cardChrome('topTalkers')}
         columns={[
           {
@@ -824,6 +856,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topReceivers}
         defaultSortKey="rxr"
+        visualization={visualization}
         {...cardChrome('topReceivers')}
         columns={[
           {
@@ -883,6 +916,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topLocalTalkers}
         defaultSortKey="txr"
+        visualization={visualization}
         {...cardChrome('topLocalTalkers')}
         columns={[
           {
@@ -942,6 +976,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topLocalReceivers}
         defaultSortKey="rxr"
+        visualization={visualization}
         {...cardChrome('topLocalReceivers')}
         columns={[
           {
@@ -1001,6 +1036,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.topProtocols}
         defaultSortKey="b"
+        visualization={visualization}
         {...cardChrome('topProtocols')}
         columns={[
           {
@@ -1033,6 +1069,7 @@ export function App() {
         legend={legend}
         rows={dashboard.data.hotFlows}
         defaultSortKey="b"
+        visualization={visualization}
         {...cardChrome('hotFlows')}
         columns={[
           {
@@ -1100,6 +1137,8 @@ export function App() {
           title="Top traffic by country"
           legend={legend}
           rows={dashboard.data.topCountries}
+          defaultSortKey="b"
+          visualization={visualization}
           {...cardChrome('topCountries')}
           columns={[
             { key: 'c', header: 'Country', width: 'primary', render: (r: CountryRow) => r.country },
@@ -1245,6 +1284,29 @@ export function App() {
                 >
                   {resolveNameMode === 'auto' ? 'Auto' : 'Disabled'}
                 </button>
+              </div>
+              <div className="window-control">
+                <p className="window-label" id="visualization-label">
+                  Visualization
+                </p>
+                <div
+                  className="window-toggle"
+                  role="group"
+                  aria-labelledby="visualization-label"
+                  aria-label="Visualization"
+                >
+                  {VISUALIZATION_OPTIONS.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={mode === visualization ? 'primary' : 'copy-btn'}
+                      aria-pressed={mode === visualization}
+                      onClick={() => onVisualizationChange(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="window-control">
                 <p className="window-label" id="traffic-window-label">

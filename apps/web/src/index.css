@@ -402,7 +402,9 @@ body {
 
 table {
   width: 100%;
-  border-collapse: collapse;
+  /* separate so <tr> row visualization backgrounds paint reliably */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   table-layout: auto;
@@ -442,6 +444,37 @@ th.num,
 td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Dashboard row visualization: share of active numeric sort column total.
+ * Inset matches td horizontal padding (0.32rem) so bars/lines line up with text.
+ * Cells stay transparent so labels stay legible on top of the fill.
+ */
+tr.viz-row > td {
+  background-color: transparent;
+}
+
+tr.viz-bars {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--theme-accent) 22%, transparent) 0 var(--viz-pct),
+    transparent var(--viz-pct)
+  );
+  background-repeat: no-repeat;
+  background-position: 0.32rem center;
+  background-size: calc(100% - 0.64rem) 72%;
+}
+
+tr.viz-lines {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--theme-accent) 65%, transparent) 0 var(--viz-pct),
+    transparent var(--viz-pct)
+  );
+  background-repeat: no-repeat;
+  background-position: 0.32rem bottom;
+  background-size: calc(100% - 0.64rem) 2px;
 }
 
 /* Long hostnames wrap instead of forcing card scrollbars */

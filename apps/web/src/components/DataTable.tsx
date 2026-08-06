@@ -1,9 +1,10 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import { useMemo, useState, type CSSProperties, type DragEvent } from 'react';
 import { CardOrderControls } from './CardOrderControls';
 import { CopyButton } from './CopyButton';
 import { rowsToCsv, rowsToRich } from './tableCopy';
 
 export type SortDir = 'asc' | 'desc';
+export type VisualizationMode = 'bars' | 'lines';
 
 /** Column width packing: primary takes remaining space; share splits it; min shrinks. */
 export type ColumnWidth = 'primary' | 'share' | 'min' | 'auto';
@@ -122,6 +123,11 @@ export interface DataTableProps<T> {
   defaultSortKey?: string;
   /** Direction for defaultSortKey (default desc). */
   defaultSortDir?: SortDir;
+  /**
+   * Optional row visualization relative to the sum of the active sort column
+   * (numeric columns only). Used on dashboard cards.
+   */
+  visualization?: VisualizationMode;
   draggable?: boolean;
   /** Layout edit mode: show drag handle + hide/wide toggles; omit copy. */
   editMode?: boolean;
@@ -161,6 +167,7 @@ export function DataTable<T>({
   tableId,
   defaultSortKey,
   defaultSortDir = 'desc',
+  visualization,
   draggable = false,
   editMode = false,
   hidden = false,
@@ -192,6 +199,23 @@ export function DataTable<T>({
     const mul = sortDir === 'asc' ? 1 : -1;
     return [...rows].sort((a, b) => mul * compareValues(pick(a), pick(b)));
   }, [columns, rows, sortDir, sortKey]);
+
+  /** Per-row share of the active numeric sort column total (0–100), or null when N/A. */
+  const vizPercents = useMemo(() => {
+    if (!visualization || !sortKey) return null;
+    const col = columns.find((c) => c.key === sortKey);
+    if (!col) return null;
+    const pick = (row: T) => (col.sortValue ? col.sortValue(row) : col.render(row));
+    const values = sortedRows.map((row) => {
+      const v = pick(row);
+      return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : null;
+    });
+    if (values.some((v) => v === null)) return null;
+    const nums = values as number[];
+    const total = nums.reduce((sum, v) => sum + v, 0);
+    if (total <= 0) return nums.map(() => 0);
+    return nums.map((v) => (v / total) * 100);
+  }, [columns, sortKey, sortedRows, visualization]);
 
   const headers = columns.map((c) => c.header);
   const stringRows = sortedRows.map((row) => columns.map((c) => String(c.render(row))));
@@ -338,35 +362,43 @@ export function DataTable<T>({
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((row, idx) => (
-                <tr key={idx}>
-                  {columns.map((c) => {
-                    const value = c.render(row);
-                    const className =
-                      [c.cellClassName, c.numeric ? 'num' : '', columnWidthClass(c)]
-                        .filter(Boolean)
-                        .join(' ') || undefined;
-                    if (c.onCellClick) {
+              {sortedRows.map((row, idx) => {
+                const pct = vizPercents?.[idx];
+                const showViz = pct != null && Boolean(visualization);
+                const rowClass = showViz ? `viz-row viz-${visualization}` : undefined;
+                const rowStyle = showViz
+                  ? ({ ['--viz-pct' as string]: `${pct}%` } as CSSProperties)
+                  : undefined;
+                return (
+                  <tr key={idx} className={rowClass} style={rowStyle}>
+                    {columns.map((c) => {
+                      const value = c.render(row);
+                      const className =
+                        [c.cellClassName, c.numeric ? 'num' : '', columnWidthClass(c)]
+                          .filter(Boolean)
+                          .join(' ') || undefined;
+                      if (c.onCellClick) {
+                        return (
+                          <td key={c.key} className={className}>
+                            <button
+                              type="button"
+                              className="linkish"
+                              onClick={() => c.onCellClick?.(row)}
+                            >
+                              {value}
+                            </button>
+                          </td>
+                        );
+                      }
                       return (
                         <td key={c.key} className={className}>
-                          <button
-                            type="button"
-                            className="linkish"
-                            onClick={() => c.onCellClick?.(row)}
-                          >
-                            {value}
-                          </button>
+                          {value}
                         </td>
                       );
-                    }
-                    return (
-                      <td key={c.key} className={className}>
-                        {value}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
