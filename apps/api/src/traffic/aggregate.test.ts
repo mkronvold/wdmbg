@@ -101,14 +101,68 @@ describe('aggregation', () => {
     );
   });
 
-  it('exposes src→dst TX and dst→src RX on hot flows', () => {
+  it('exposes LAN-centric TX/RX on hot flows when LAN is already src', () => {
     const store = new TrafficStore();
     const now = 1_800_000_000;
     seed(store, now);
     const dash = buildDashboard(store, '30s', now);
     const https = dash.hotFlows.find((f) => f.dst === '1.1.1.1');
+    expect(https?.src).toBe('10.0.0.10');
     expect(https?.txBytes).toBe(1000);
     expect(https?.rxBytes).toBe(9000);
+  });
+
+  it('reorients hot flows when remote IP sorts before LAN so download is RX', () => {
+    // Probe canonicalize: "1.1.1.1" < "10.0.0.10" → remote is wire-src.
+    // Download remote→LAN is bytesSrcToDst on the wire sample; Bulk flows must
+    // still show LAN as src with RX = download (not TX).
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    const download = (300e6 / 8) * 30; // 300 Mbps average over 30s
+    const upload = 1_000_000;
+    store.ingest({
+      probeId: 't',
+      sentAt: new Date(now * 1000).toISOString(),
+      intervalSec: 1,
+      buckets: [
+        {
+          t: now,
+          flows: [
+            {
+              src: '1.1.1.1',
+              dst: '10.0.0.10',
+              srcPort: 443,
+              dstPort: 50000,
+              l4: 'tcp',
+              l7: 'https',
+              bytesSrcToDst: download,
+              bytesDstToSrc: upload,
+              packetsSrcToDst: 100,
+              packetsDstToSrc: 10,
+            },
+          ],
+        },
+      ],
+    });
+    const dash = buildDashboard(store, '30s', now);
+    expect(dash.hotFlows).toHaveLength(1);
+    const flow = dash.hotFlows[0]!;
+    expect(flow.src).toBe('10.0.0.10');
+    expect(flow.srcPort).toBe(50000);
+    expect(flow.dst).toBe('1.1.1.1');
+    expect(flow.dstPort).toBe(443);
+    expect(flow.txBytes).toBe(upload);
+    expect(flow.rxBytes).toBe(download);
+    expect(flow.bytes).toBe(upload + download);
+
+    // Host-relative path must agree for the LAN host.
+    const host = hostFlows(store, '10.0.0.10', '30s', now);
+    expect(host.flows[0]?.txBytes).toBe(upload);
+    expect(host.flows[0]?.rxBytes).toBe(download);
+    const summary = hostSummary(store, '10.0.0.10', '30s', now);
+    expect(summary.txBytes).toBe(upload);
+    expect(summary.rxBytes).toBe(download);
+    expect(summary.rxRateBps).toBeCloseTo(300e6, 3);
   });
 
   it('attaches flow labels and can exclude local pairs', () => {
@@ -178,8 +232,11 @@ describe('aggregation', () => {
     const now = 1_800_000_000;
     seed(store, now);
     // seed: local pair 10.0.0.20→10.0.0.10 (200+50) and internet 10.0.0.10→1.1.1.1 (1000+9000)
+    // Ingest canonicalizes so lower IP is src: local becomes 10.0.0.10→10.0.0.20
+    // with directions flipped (50 src→dst, 200 dst→src). LAN↔LAN TX/RX follow that
+    // stable orientation; totals are unchanged.
     const summary = buildTrafficSummary(store.aggregateFlows('5s', now));
-    expect(summary.local).toEqual({ txBytes: 200, rxBytes: 50, totalBytes: 250 });
+    expect(summary.local).toEqual({ txBytes: 50, rxBytes: 200, totalBytes: 250 });
     // LAN-centric: TX = LAN→remote 1000, RX = remote→LAN 9000
     expect(summary.internet).toEqual({ txBytes: 1000, rxBytes: 9000, totalBytes: 10_000 });
 
@@ -287,5 +344,58 @@ describe('aggregation', () => {
     expect(flows).toHaveLength(1);
     expect(flows[0]?.bytesSrcToDst).toBe(80);
     expect(flows[0]?.bytesDstToSrc).toBe(160);
+  });
+
+  it('merges reverse orientations and ignores L7 in the flow key', () => {
+    const store = new TrafficStore();
+    const now = 1_800_000_000;
+    store.ingest({
+      probeId: 't',
+      sentAt: new Date().toISOString(),
+      intervalSec: 1,
+      buckets: [
+        {
+          t: now - 1,
+          flows: [
+            {
+              src: '10.0.0.10',
+              dst: '1.1.1.1',
+              srcPort: 40000,
+              dstPort: 443,
+              l4: 'tcp',
+              l7: 'https',
+              bytesSrcToDst: 100,
+              bytesDstToSrc: 0,
+              packetsSrcToDst: 1,
+              packetsDstToSrc: 0,
+            },
+          ],
+        },
+        {
+          t: now,
+          flows: [
+            // Reverse orientation + different L7 label must still merge.
+            {
+              src: '1.1.1.1',
+              dst: '10.0.0.10',
+              srcPort: 443,
+              dstPort: 40000,
+              l4: 'tcp',
+              l7: 'http',
+              bytesSrcToDst: 900,
+              bytesDstToSrc: 0,
+              packetsSrcToDst: 1,
+              packetsDstToSrc: 0,
+            },
+          ],
+        },
+      ],
+    });
+    const flows = store.aggregateFlows('5s', now);
+    expect(flows).toHaveLength(1);
+    // Canonical: "1.1.1.1" < "10.0.0.10" → src is remote.
+    expect(flows[0]?.src).toBe('1.1.1.1');
+    expect(flows[0]?.bytesSrcToDst).toBe(900);
+    expect(flows[0]?.bytesDstToSrc).toBe(100);
   });
 });

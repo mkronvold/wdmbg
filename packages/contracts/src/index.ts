@@ -97,7 +97,8 @@ export const flowRowSchema = z.object({
   /**
    * Directional bytes.
    * - Host-relative views: TX/RX from the selected host's perspective.
-   * - Hot flows (no host): TX = src→dst, RX = dst→src.
+   * - Hot flows (no host): when one end is LAN, row is reoriented so LAN is
+   *   `src` and TX = LAN→remote, RX = remote→LAN; otherwise TX = src→dst.
    */
   txBytes: z.number().nonnegative().optional(),
   rxBytes: z.number().nonnegative().optional(),

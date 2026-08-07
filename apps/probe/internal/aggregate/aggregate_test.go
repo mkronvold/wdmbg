@@ -69,3 +69,21 @@ func TestGuessL7(t *testing.T) {
 		t.Fatal("expected https")
 	}
 }
+
+func TestL7NotPartOfFlowKey(t *testing.T) {
+	a := NewSecondAggregator()
+	ts := time.Unix(200, 0)
+	// Both ports are well-known: per-packet GuessL7 would flip http/https.
+	// Identity must stay the 5-tuple so both directions merge.
+	a.Observe(ts, "10.0.0.10", "10.0.0.20", 80, 443, L4TCP, "https", 100)
+	a.Observe(ts, "10.0.0.20", "10.0.0.10", 443, 80, L4TCP, "http", 900)
+	buckets := a.ForceFlush()
+	if len(buckets) != 1 || len(buckets[0].Flows) != 1 {
+		t.Fatalf("expected 1 merged flow, got %+v", buckets)
+	}
+	f := buckets[0].Flows[0]
+	total := f.BytesSrcToDst + f.BytesDstToSrc
+	if total != 1000 {
+		t.Fatalf("expected 1000 bytes, got %d (fwd=%d rev=%d)", total, f.BytesSrcToDst, f.BytesDstToSrc)
+	}
+}

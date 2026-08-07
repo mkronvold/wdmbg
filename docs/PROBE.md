@@ -65,6 +65,10 @@ go run . -iface vmbr0 -ingest-url http://wdmbg.lan/api/ingest/rollups
   packets with snaplen 128 undercount by ~12×).
 - Export POST runs on a background goroutine so HTTP latency cannot stall the
   capture loop.
+- Flow identity is the **5-tuple** (IPs, ports, L4). L7 port labels are not part
+  of the merge key.
+- Bidirectional counters are stored in a stable lexicographic orientation; the
+  API reorients Bulk flow TX/RX to **LAN-centric** (TX = LAN→remote) for display.
 
 ## Runtime layout
 

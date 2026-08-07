@@ -31,10 +31,12 @@ export interface HostRelativeBytes {
   rxBytes: number;
 }
 
-export function flowKey(
-  f: Pick<StoredFlow, 'src' | 'dst' | 'srcPort' | 'dstPort' | 'l4' | 'l7'>,
-): string {
-  return `${f.src}\0${f.srcPort}\0${f.dst}\0${f.dstPort}\0${f.l4}\0${f.l7 ?? ''}`;
+/**
+ * Flow identity is the 5-tuple only. L7 is a label and must not split merges
+ * (both ports can be well-known, so per-packet GuessL7 can flip).
+ */
+export function flowKey(f: Pick<StoredFlow, 'src' | 'dst' | 'srcPort' | 'dstPort' | 'l4'>): string {
+  return `${f.src}\0${f.srcPort}\0${f.dst}\0${f.dstPort}\0${f.l4}`;
 }
 
 export function hostRelative(host: string, flow: StoredFlow): HostRelativeBytes | null {
@@ -45,6 +47,28 @@ export function hostRelative(host: string, flow: StoredFlow): HostRelativeBytes 
     return { txBytes: flow.bytesDstToSrc, rxBytes: flow.bytesSrcToDst };
   }
   return null;
+}
+
+/** Stable orientation: lower endpoint string wins as src (matches probe canonicalize). */
+export function canonicalizeFlow(flow: StoredFlow): StoredFlow {
+  if (flow.src < flow.dst || (flow.src === flow.dst && flow.srcPort <= flow.dstPort)) {
+    return flow;
+  }
+  const flipped: StoredFlow = {
+    src: flow.dst,
+    dst: flow.src,
+    srcPort: flow.dstPort,
+    dstPort: flow.srcPort,
+    l4: flow.l4,
+    bytesSrcToDst: flow.bytesDstToSrc,
+    bytesDstToSrc: flow.bytesSrcToDst,
+    packetsSrcToDst: flow.packetsDstToSrc,
+    packetsDstToSrc: flow.packetsSrcToDst,
+  };
+  if (flow.l7 !== undefined) {
+    flipped.l7 = flow.l7;
+  }
+  return flipped;
 }
 
 function toStored(sample: FlowSample): StoredFlow {
@@ -62,7 +86,7 @@ function toStored(sample: FlowSample): StoredFlow {
   if (sample.l7 !== undefined) {
     flow.l7 = sample.l7;
   }
-  return flow;
+  return canonicalizeFlow(flow);
 }
 
 function mergeFlow(into: StoredFlow, add: StoredFlow): void {
