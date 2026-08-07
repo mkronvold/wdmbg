@@ -297,6 +297,21 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.panel-head-actions .settings-toggle {
+  margin-top: 0;
+}
+
+.host-settings-controls {
+  margin-bottom: 0.25rem;
+}
+
 .panel-title-block {
   min-width: 0;
 }

@@ -184,7 +184,18 @@ function renderApp() {
 }
 
 function openSettings(view: ReturnType<typeof within>) {
-  const gear = view.getByRole('button', { name: 'Settings' });
+  const gears = view.getAllByRole('button', { name: 'Settings' });
+  // Prefer dashboard hero gear when HostDialog is also open.
+  const gear = gears.find((el: HTMLElement) => !el.closest('[role="dialog"]')) ?? gears[0]!;
+  if (gear.getAttribute('aria-expanded') !== 'true') {
+    fireEvent.click(gear);
+  }
+  return gear;
+}
+
+function openHostDialogSettings(dialog: HTMLElement) {
+  const dlg = within(dialog);
+  const gear = dlg.getByRole('button', { name: 'Settings' });
   if (gear.getAttribute('aria-expanded') !== 'true') {
     fireEvent.click(gear);
   }
@@ -239,6 +250,8 @@ describe('App', () => {
     window.history.replaceState({}, '', '/');
     document.documentElement.removeAttribute('data-theme');
     vi.mocked(client.fetchDashboard).mockClear();
+    vi.mocked(client.fetchHost).mockClear();
+    vi.mocked(client.fetchHostFlows).mockClear();
     vi.mocked(client.resolveHosts).mockClear();
     vi.mocked(client.fetchHealth).mockImplementation(async () => ({
       status: 'ok',
@@ -1249,6 +1262,200 @@ describe('App', () => {
     expect(JSON.parse(localStorage.getItem('wdmbg.tableSort') ?? '{}')).toMatchObject({
       'host-totals': { key: 'tx', dir: 'desc' },
     });
+  });
+
+  it('seeds HostDialog window and refresh from dashboard and keeps them local', async () => {
+    localStorage.setItem('wdmbg.trafficWindow', '5m');
+    localStorage.setItem('wdmbg.displayRefresh', '30s');
+    localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    const dlg = within(dialog);
+    openHostDialogSettings(dialog);
+
+    expect(
+      within(dlg.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '5m',
+      }),
+    ).toHaveClass('primary');
+    expect(
+      (dlg.getByRole('combobox', { name: 'Display Refresh' }) as HTMLSelectElement).value,
+    ).toBe('30s');
+
+    fireEvent.click(
+      within(dlg.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '15m',
+      }),
+    );
+    fireEvent.change(dlg.getByRole('combobox', { name: 'Display Refresh' }), {
+      target: { value: 'pause' },
+    });
+
+    await waitFor(() => {
+      expect(vi.mocked(client.fetchHost).mock.calls.some((c) => c[1] === '15m')).toBe(true);
+    });
+    expect(dlg.getByText('Paused')).toBeInTheDocument();
+
+    // Dashboard prefs must stay unchanged.
+    expect(localStorage.getItem('wdmbg.trafficWindow')).toBe('5m');
+    expect(localStorage.getItem('wdmbg.displayRefresh')).toBe('30s');
+    openSettings(view);
+    const dashWindow = view
+      .getAllByRole('group', { name: 'Traffic window' })
+      .find((el: HTMLElement) => !el.closest('[role="dialog"]'))!;
+    expect(within(dashWindow).getByRole('button', { name: '5m' })).toHaveClass('primary');
+    expect(
+      (
+        view
+          .getAllByRole('combobox', { name: 'Display Refresh' })
+          .find((el: HTMLElement) => !el.closest('[role="dialog"]')) as HTMLSelectElement
+      ).value,
+    ).toBe('30s');
+
+    // Re-open reseeds from dashboard (not last dialog-local values).
+    fireEvent.click(dlg.getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(view.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const reopened = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    openHostDialogSettings(reopened);
+    const reDlg = within(reopened);
+    expect(
+      within(reDlg.getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '5m',
+      }),
+    ).toHaveClass('primary');
+    expect(
+      (reDlg.getByRole('combobox', { name: 'Display Refresh' }) as HTMLSelectElement).value,
+    ).toBe('30s');
+    expect(reDlg.queryByText('Paused')).not.toBeInTheDocument();
+  });
+
+  it('keeps HostDialog local window across peer navigation', async () => {
+    localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    let dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    openHostDialogSettings(dialog);
+    fireEvent.click(
+      within(within(dialog).getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '15m',
+      }),
+    );
+    await waitFor(() => {
+      expect(vi.mocked(client.fetchHost).mock.calls.some((c) => c[1] === '15m')).toBe(true);
+    });
+
+    fireEvent.click(
+      await within(dialog).findByRole('button', { name: /cloudflare \(1\.1\.1\.1\)/ }),
+    );
+    dialog = await view.findByRole('dialog', { name: /Host 1\.1\.1\.1/i });
+    openHostDialogSettings(dialog);
+    expect(
+      within(within(dialog).getByRole('group', { name: 'Traffic window' })).getByRole('button', {
+        name: '15m',
+      }),
+    ).toHaveClass('primary');
+    await waitFor(() => {
+      expect(
+        vi.mocked(client.fetchHost).mock.calls.some((c) => c[0] === '1.1.1.1' && c[1] === '15m'),
+      ).toBe(true);
+    });
+    expect(localStorage.getItem('wdmbg.trafficWindow')).toBeNull();
+  });
+
+  it('shares Visualization between HostDialog and dashboard and persists it', async () => {
+    localStorage.setItem('wdmbg.dashboard.hiddenCards', JSON.stringify([]));
+    localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
+    const { container } = renderApp();
+    const view = within(container);
+    await waitFor(() => {
+      expect(view.getByRole('heading', { name: 'Top talkers' })).toBeInTheDocument();
+    });
+
+    fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+    const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+    const dlg = within(dialog);
+    await waitFor(() => {
+      expect(dlg.getByRole('heading', { name: 'Top protocols' })).toBeInTheDocument();
+    });
+
+    // Default bars on host tables.
+    const hostProtocols = dlg.getByRole('heading', { name: 'Top protocols' }).closest('section')!;
+    expect(hostProtocols.querySelectorAll('tbody tr.viz-row.viz-bars').length).toBeGreaterThan(0);
+
+    openHostDialogSettings(dialog);
+    fireEvent.click(
+      within(dlg.getByRole('group', { name: 'Visualization' })).getByRole('button', {
+        name: 'lines',
+      }),
+    );
+    expect(localStorage.getItem('wdmbg.visualization')).toBe('lines');
+    expect(hostProtocols.querySelectorAll('tbody tr.viz-row.viz-lines').length).toBeGreaterThan(0);
+
+    // Dashboard tables and settings reflect the shared change.
+    const talkers = view.getByRole('heading', { name: 'Top talkers' }).closest('section')!;
+    expect(talkers.querySelectorAll('tbody tr.viz-row.viz-lines').length).toBe(2);
+    openSettings(view);
+    expect(
+      within(
+        view
+          .getAllByRole('group', { name: 'Visualization' })
+          .find((el: HTMLElement) => !el.closest('[role="dialog"]'))!,
+      ).getByRole('button', { name: 'lines' }),
+    ).toHaveClass('primary');
+  });
+
+  it('refetches HostDialog queries on display refresh interval', async () => {
+    localStorage.setItem('wdmbg.displayRefresh', 'pause');
+    localStorage.setItem(RESOLVE_NAME_KEY, 'disabled');
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { container } = renderApp();
+      const view = within(container);
+      await waitFor(() => {
+        expect(view.getByRole('heading', { name: 'Traffic summary' })).toBeInTheDocument();
+      });
+
+      fireEvent.click(view.getAllByRole('button', { name: /laptop \(10\.0\.0\.10\)/ })[0]!);
+      const dialog = await view.findByRole('dialog', { name: /Host 10\.0\.0\.10/i });
+      await waitFor(() => {
+        expect(within(dialog).getByRole('heading', { name: 'Totals' })).toBeInTheDocument();
+      });
+
+      const hostCallsAfterOpen = vi.mocked(client.fetchHost).mock.calls.length;
+      expect(hostCallsAfterOpen).toBeGreaterThan(0);
+
+      // Still paused (seeded from dashboard) — no interval refetch.
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(vi.mocked(client.fetchHost).mock.calls.length).toBe(hostCallsAfterOpen);
+
+      openHostDialogSettings(dialog);
+      fireEvent.change(within(dialog).getByRole('combobox', { name: 'Display Refresh' }), {
+        target: { value: '1s' },
+      });
+      // Dialog-local only — dashboard refresh pref unchanged.
+      expect(localStorage.getItem('wdmbg.displayRefresh')).toBe('pause');
+
+      await vi.advanceTimersByTimeAsync(1200);
+      await waitFor(() => {
+        expect(vi.mocked(client.fetchHost).mock.calls.length).toBeGreaterThan(hostCallsAfterOpen);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('adds, persists, hides, wides, and deletes URL cards', async () => {
