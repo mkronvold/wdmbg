@@ -107,6 +107,6 @@ test.describe('WDMBG UX polish (theme / refresh / local / deep link)', () => {
     });
     await expect(page.getByText(/last 1h/).first()).toBeVisible();
     await expect(page.getByText(/Totals in MB/).first()).toBeVisible();
-    await expect(page.getByText(/Rates in Mbps/).first()).toBeVisible();
+    await expect(page.getByText(/Rates in avg Mbps/).first()).toBeVisible();
   });
 });

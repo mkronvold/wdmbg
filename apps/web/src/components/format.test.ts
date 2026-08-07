@@ -54,6 +54,6 @@ describe('formatBytes', () => {
 
 describe('windowLegend', () => {
   it('uses last-window wording and units', () => {
-    expect(windowLegend('30s')).toBe('last 30s · Totals in MB · Rates in Mbps');
+    expect(windowLegend('30s')).toBe('last 30s · Totals in MB · Rates in avg Mbps');
   });
 });
