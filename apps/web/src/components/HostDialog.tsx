@@ -4,12 +4,25 @@ import { WINDOW_SECONDS } from '@wdmbg/contracts';
 import { useEffect, useState } from 'react';
 import { clearAlias, fetchHost, fetchHostFlows, putAlias, resolveHosts } from '../api/client';
 import { collectUnnamedFromHost, queueAutoResolve } from '../autoResolve';
+import {
+  DISPLAY_REFRESH_OPTIONS,
+  WINDOWS,
+  VISUALIZATION_OPTIONS,
+  displayRefreshInterval,
+  type DisplayRefreshId,
+  type VisualizationMode,
+} from '../displayPrefs';
 import { DataTable } from './DataTable';
 import { formatMb, formatMbps, hostLabel, windowLegend } from './format';
 
 export interface HostDialogProps {
   host: string;
-  window: QueryWindow;
+  /** Dashboard traffic window — seed only for dialog-local window state */
+  initialWindow: QueryWindow;
+  /** Dashboard display refresh id — seed only */
+  initialDisplayRefresh: DisplayRefreshId;
+  visualization: VisualizationMode;
+  onVisualizationChange: (mode: VisualizationMode) => void;
   excludeLocal?: boolean;
   /** When false, omit Country column (GeoIP DB not present). */
   showCountry?: boolean;
@@ -26,9 +39,30 @@ type TotalsRow = {
   totalBytes: number;
 };
 
+function GearIcon() {
+  return (
+    <svg
+      className="settings-gear-icon"
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.55-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.77 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.68.22l2.39-.96c.5.39 1.04.7 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.55 1.63-.94l2.39.96c.25.12.54.02.68-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"
+      />
+    </svg>
+  );
+}
+
 export function HostDialog({
   host,
-  window,
+  initialWindow,
+  initialDisplayRefresh,
+  visualization,
+  onVisualizationChange,
   excludeLocal = false,
   showCountry = false,
   autoResolve = false,
@@ -38,8 +72,16 @@ export function HostDialog({
   const qc = useQueryClient();
   const [aliasDraft, setAliasDraft] = useState('');
   const [aliasHost, setAliasHost] = useState(host);
+  // Seed once from dashboard on open; peer navigation must not reset these.
+  const [window, setWindow] = useState<QueryWindow>(initialWindow);
+  const [displayRefresh, setDisplayRefresh] = useState<DisplayRefreshId>(initialDisplayRefresh);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const secs = WINDOW_SECONDS[window];
   const legend = windowLegend(window);
+  const refetchInterval = displayRefreshInterval(displayRefresh);
+  const paused = refetchInterval === false;
+  const tableVisualization = visualization === 'off' ? undefined : visualization;
 
   // Reset draft when the selected host changes (prefer render-time adjust over effect).
   if (aliasHost !== host) {
@@ -54,10 +96,12 @@ export function HostDialog({
   const summary = useQuery({
     queryKey: ['host', host, window, excludeLocal],
     queryFn: () => fetchHost(host, window, excludeLocal),
+    refetchInterval,
   });
   const flows = useQuery({
     queryKey: ['host-flows', host, window, excludeLocal],
     queryFn: () => fetchHostFlows(host, window, excludeLocal),
+    refetchInterval,
   });
 
   useEffect(() => {
@@ -131,12 +175,100 @@ export function HostDialog({
         <div className="panel-head">
           <div className="panel-title-block">
             <h2>{hostLabel(host, summary.data?.label)}</h2>
-            <p className="panel-legend">{legend}</p>
+            <p className="panel-legend">
+              {legend}
+              {paused ? (
+                <>
+                  {' · '}
+                  <span className="paused-badge">Paused</span>
+                </>
+              ) : null}
+            </p>
           </div>
-          <button type="button" className="copy-btn" onClick={onClose}>
-            Close
-          </button>
+          <div className="panel-head-actions">
+            <button
+              type="button"
+              className={`settings-toggle${settingsOpen ? ' active' : ''}`}
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              aria-controls="host-settings-panel"
+              onClick={() => setSettingsOpen((open) => !open)}
+            >
+              <GearIcon />
+            </button>
+            <button type="button" className="copy-btn" onClick={onClose}>
+              Close
+            </button>
+          </div>
         </div>
+
+        {settingsOpen ? (
+          <div id="host-settings-panel" className="hero-controls host-settings-controls">
+            <div className="window-control">
+              <p className="window-label" id="host-visualization-label">
+                Visualization
+              </p>
+              <div
+                className="window-toggle"
+                role="group"
+                aria-labelledby="host-visualization-label"
+                aria-label="Visualization"
+              >
+                {VISUALIZATION_OPTIONS.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={mode === visualization ? 'primary' : 'copy-btn'}
+                    aria-pressed={mode === visualization}
+                    onClick={() => onVisualizationChange(mode)}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="window-control">
+              <label className="window-label" htmlFor="host-display-refresh-select">
+                Display Refresh
+              </label>
+              <select
+                id="host-display-refresh-select"
+                className="theme-select"
+                value={displayRefresh}
+                aria-label="Display Refresh"
+                onChange={(event) => setDisplayRefresh(event.target.value as DisplayRefreshId)}
+              >
+                {DISPLAY_REFRESH_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="window-control">
+              <p className="window-label" id="host-traffic-window-label">
+                Traffic window
+              </p>
+              <div
+                className="window-toggle"
+                role="group"
+                aria-labelledby="host-traffic-window-label"
+                aria-label="Traffic window"
+              >
+                {WINDOWS.map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    className={w === window ? 'primary' : 'copy-btn'}
+                    onClick={() => setWindow(w)}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {summary.isLoading && <p className="muted">Loading host…</p>}
 
@@ -146,6 +278,7 @@ export function HostDialog({
             tableId="host-totals"
             legend={legend}
             rows={totals}
+            visualization={tableVisualization}
             columns={[
               {
                 key: 'tx',
@@ -193,6 +326,7 @@ export function HostDialog({
             legend={legend}
             rows={summary.data.topProtocols}
             defaultSortKey="b"
+            visualization={tableVisualization}
             columns={[
               {
                 key: 'p',
@@ -224,6 +358,7 @@ export function HostDialog({
             legend={legend}
             rows={summary.data.topPeers}
             defaultSortKey="rx"
+            visualization={tableVisualization}
             columns={[
               {
                 key: 'h',
@@ -282,6 +417,7 @@ export function HostDialog({
             legend={legend}
             rows={flows.data.flows}
             defaultSortKey="rxr"
+            visualization={tableVisualization}
             columns={[
               {
                 key: 'src',

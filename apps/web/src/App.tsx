@@ -31,6 +31,13 @@ import { formatBytes, formatMb, formatMbps, hostLabel, windowLegend } from './co
 import { HostDialog } from './components/HostDialog';
 import { UrlCard } from './components/UrlCard';
 import {
+  DISPLAY_REFRESH_OPTIONS,
+  WINDOWS,
+  VISUALIZATION_OPTIONS,
+  type DisplayRefreshId,
+  type VisualizationMode,
+} from './displayPrefs';
+import {
   THEME_IDS,
   THEME_LABELS,
   applyTheme,
@@ -60,8 +67,6 @@ import {
   type UrlCardId,
 } from './urlCards';
 
-const WINDOWS: QueryWindow[] = ['5s', '30s', '5m', '15m', '30m', '1h'];
-
 const CARD_ORDER_KEY = 'wdmbg.dashboard.cardOrder';
 const HIDDEN_CARDS_KEY = 'wdmbg.dashboard.hiddenCards';
 const WIDE_CARDS_KEY = 'wdmbg.dashboard.wideCards';
@@ -70,9 +75,6 @@ const DISPLAY_REFRESH_KEY = 'wdmbg.displayRefresh';
 const LOCAL_TRAFFIC_KEY = 'wdmbg.localTraffic';
 const TRAFFIC_WINDOW_KEY = 'wdmbg.trafficWindow';
 const VISUALIZATION_KEY = 'wdmbg.visualization';
-
-const VISUALIZATION_OPTIONS = ['bars', 'lines', 'off'] as const;
-type VisualizationMode = (typeof VISUALIZATION_OPTIONS)[number];
 
 /** Builtin ids in factory visible-first order (hidden builtins follow). */
 const DEFAULT_CARD_ORDER = [
@@ -106,18 +108,6 @@ const FACTORY_CARD_ORDER: readonly string[] = [
   'topProtocols',
   'topCountries',
 ];
-
-const DISPLAY_REFRESH_OPTIONS = [
-  { id: 'pause', label: 'Pause', ms: null as number | null },
-  { id: '1s', label: '1s', ms: 1_000 },
-  { id: '5s', label: '5s', ms: 5_000 },
-  { id: '30s', label: '30s', ms: 30_000 },
-  { id: '1m', label: '1m', ms: 60_000 },
-  { id: '5m', label: '5m', ms: 300_000 },
-  { id: '15m', label: '15m', ms: 900_000 },
-] as const;
-
-type DisplayRefreshId = (typeof DISPLAY_REFRESH_OPTIONS)[number]['id'];
 
 function readJsonLocal(key: string): unknown {
   try {
@@ -1550,9 +1540,11 @@ export function App() {
 
       {selectedHost && (
         <HostDialog
-          key={selectedHost}
           host={selectedHost}
-          window={window}
+          initialWindow={window}
+          initialDisplayRefresh={displayRefresh}
+          visualization={visualization}
+          onVisualizationChange={onVisualizationChange}
           excludeLocal={excludeLocal}
           showCountry={geoipPresent}
           autoResolve={resolveNameMode === 'auto'}
