@@ -15,18 +15,19 @@ const (
 	L4Other L4 = "other"
 )
 
-// FlowKey identifies a bidirectional conversation endpoint pair as observed.
+// FlowKey identifies a bidirectional conversation by 5-tuple only.
+// L7 is a display label on the sample, not part of identity — both ports can
+// be well-known so per-packet GuessL7 must not split one conversation.
 type FlowKey struct {
 	Src     string
 	Dst     string
 	SrcPort uint16
 	DstPort uint16
 	L4      L4
-	L7      string
 }
 
 func (k FlowKey) String() string {
-	return fmt.Sprintf("%s|%d|%s|%d|%s|%s", k.Src, k.SrcPort, k.Dst, k.DstPort, k.L4, k.L7)
+	return fmt.Sprintf("%s|%d|%s|%d|%s", k.Src, k.SrcPort, k.Dst, k.DstPort, k.L4)
 }
 
 // Counters are directional relative to Src -> Dst.
@@ -64,6 +65,7 @@ type SecondAggregator struct {
 
 type flowState struct {
 	key FlowKey
+	l7  string
 	Counters
 }
 
@@ -98,12 +100,14 @@ func (a *SecondAggregator) Observe(ts time.Time, src, dst string, srcPort, dstPo
 		}
 		a.current = sec
 	}
-	key, dirForward := canonicalize(src, dst, srcPort, dstPort, l4, l7)
+	key, dirForward := canonicalize(src, dst, srcPort, dstPort, l4)
 	id := key.String()
 	st, ok := a.flows[id]
 	if !ok {
-		st = &flowState{key: key}
+		st = &flowState{key: key, l7: l7}
 		a.flows[id] = st
+	} else if st.l7 == "" && l7 != "" {
+		st.l7 = l7
 	}
 	if dirForward {
 		st.BytesSrcToDst += bytes
@@ -115,14 +119,12 @@ func (a *SecondAggregator) Observe(ts time.Time, src, dst string, srcPort, dstPo
 	return closed
 }
 
-func canonicalize(src, dst string, srcPort, dstPort uint16, l4 L4, l7 string) (FlowKey, bool) {
-	// Keep observation orientation as Src/Dst of first packet of the flow key:
-	// lower endpoint string wins as Src for stable keys when ports equal-ish —
-	// MVP: first-seen orientation via map key using sorted endpoints for L4 sessions.
+func canonicalize(src, dst string, srcPort, dstPort uint16, l4 L4) (FlowKey, bool) {
+	// Lower endpoint string wins as Src for a stable bidirectional key.
 	if src < dst || (src == dst && srcPort <= dstPort) {
-		return FlowKey{Src: src, Dst: dst, SrcPort: srcPort, DstPort: dstPort, L4: l4, L7: l7}, true
+		return FlowKey{Src: src, Dst: dst, SrcPort: srcPort, DstPort: dstPort, L4: l4}, true
 	}
-	return FlowKey{Src: dst, Dst: src, SrcPort: dstPort, DstPort: srcPort, L4: l4, L7: l7}, false
+	return FlowKey{Src: dst, Dst: src, SrcPort: dstPort, DstPort: srcPort, L4: l4}, false
 }
 
 // FlushClosed returns completed buckets for seconds < nowSec and advances.
@@ -164,8 +166,8 @@ func (a *SecondAggregator) snapshotLocked() Bucket {
 			PacketsSrcToDst: st.PacketsSrcToDst,
 			PacketsDstToSrc: st.PacketsDstToSrc,
 		}
-		if st.key.L7 != "" {
-			s.L7 = st.key.L7
+		if st.l7 != "" {
+			s.L7 = st.l7
 		}
 		flows = append(flows, s)
 	}

@@ -164,40 +164,88 @@ export function topProtocols(flows: StoredFlow[], limit = 10): ProtocolRow[] {
   return sortByBytesDesc([...map.values()], (r) => r.bytes, limit);
 }
 
+/**
+ * Build a FlowRow for dashboard hot flows or host-relative flows.
+ *
+ * Host path: keep stored 5-tuple; TX/RX from the selected host's perspective.
+ *
+ * Hot flows (no host): when exactly one endpoint is LAN, **reorient** the row so
+ * LAN is `src` and remote is `dst`. Then TX = LAN→remote and RX = remote→LAN,
+ * matching traffic-summary / talker semantics. Lexicographic wire orientation
+ * alone puts many public IPs (e.g. 1.1.1.1) before 10.x, which made downloads
+ * appear as TX Mbps on Bulk flows.
+ */
 export function toFlowRow(
   flow: StoredFlow,
   host?: string,
   labels: LabelLookup = defaultCountryLookup,
 ): FlowRow {
-  const bytes = flow.bytesSrcToDst + flow.bytesDstToSrc;
   const packets = flow.packetsSrcToDst + flow.packetsDstToSrc;
-  const row: FlowRow = {
-    src: flow.src,
-    srcPort: flow.srcPort,
-    dst: flow.dst,
-    dstPort: flow.dstPort,
-    l4: flow.l4,
-    bytes,
-    packets,
-  };
-  if (flow.l7 !== undefined) {
-    row.l7 = flow.l7;
-  }
-  const srcLabel = labels.getLabel(flow.src);
-  const dstLabel = labels.getLabel(flow.dst);
-  if (srcLabel !== undefined) row.srcLabel = srcLabel;
-  if (dstLabel !== undefined) row.dstLabel = dstLabel;
+
   if (host) {
+    const bytes = flow.bytesSrcToDst + flow.bytesDstToSrc;
+    const row: FlowRow = {
+      src: flow.src,
+      srcPort: flow.srcPort,
+      dst: flow.dst,
+      dstPort: flow.dstPort,
+      l4: flow.l4,
+      bytes,
+      packets,
+    };
+    if (flow.l7 !== undefined) {
+      row.l7 = flow.l7;
+    }
+    const srcLabel = labels.getLabel(flow.src);
+    const dstLabel = labels.getLabel(flow.dst);
+    if (srcLabel !== undefined) row.srcLabel = srcLabel;
+    if (dstLabel !== undefined) row.dstLabel = dstLabel;
     const rel = hostRelative(host, flow);
     if (rel) {
       row.txBytes = rel.txBytes;
       row.rxBytes = rel.rxBytes;
     }
-  } else {
-    // Hot flows (no host context): TX = src→dst, RX = dst→src.
-    row.txBytes = flow.bytesSrcToDst;
-    row.rxBytes = flow.bytesDstToSrc;
+    return row;
   }
+
+  // Hot flows: LAN-centric display orientation when one end is private.
+  const srcLocal = isLocalAddress(flow.src);
+  const dstLocal = isLocalAddress(flow.dst);
+  let src = flow.src;
+  let dst = flow.dst;
+  let srcPort = flow.srcPort;
+  let dstPort = flow.dstPort;
+  let txBytes = flow.bytesSrcToDst;
+  let rxBytes = flow.bytesDstToSrc;
+
+  if (!srcLocal && dstLocal) {
+    // Remote sorted as wire-src; flip so LAN is src for TX/RX labels.
+    src = flow.dst;
+    dst = flow.src;
+    srcPort = flow.dstPort;
+    dstPort = flow.srcPort;
+    txBytes = flow.bytesDstToSrc;
+    rxBytes = flow.bytesSrcToDst;
+  }
+
+  const row: FlowRow = {
+    src,
+    srcPort,
+    dst,
+    dstPort,
+    l4: flow.l4,
+    bytes: txBytes + rxBytes,
+    packets,
+    txBytes,
+    rxBytes,
+  };
+  if (flow.l7 !== undefined) {
+    row.l7 = flow.l7;
+  }
+  const srcLabel = labels.getLabel(src);
+  const dstLabel = labels.getLabel(dst);
+  if (srcLabel !== undefined) row.srcLabel = srcLabel;
+  if (dstLabel !== undefined) row.dstLabel = dstLabel;
   return row;
 }
 
