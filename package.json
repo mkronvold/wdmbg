@@ -24,8 +24,8 @@
     "validate": "pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm format:check"
   },
   "devDependencies": {
-    "prettier": "^3.6.2",
-    "turbo": "^2.5.4",
+    "prettier": "^3.9.8",
+    "turbo": "^2.11.3",
     "typescript": "^5.9.2"
   }
 }
