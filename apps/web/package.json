@@ -13,26 +13,26 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-query": "^5.104.2",
     "@wdmbg/contracts": "workspace:*",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
-    "@types/node": "^26.1.2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
-    "globals": "^17.8.0",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
     "jsdom": "^26.1.0",
     "typescript": "^5.9.2",
-    "typescript-eslint": "^8.38.0",
+    "typescript-eslint": "^8.71.2",
     "vite": "^7.0.6",
     "vitest": "^4.1.10"
   }
